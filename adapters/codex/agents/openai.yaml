@@ -1,0 +1,6 @@
+version: 1
+metadata:
+  display_name: "Foreign Listening Material"
+  short_description: "Turn multilingual audio or video into Markdown listening-study notes."
+  default_prompt: "Use $foreign-listening-material to import audio from a URL or local file, transcribe it with the repository CLI, render a plain Markdown draft, then complete Listening Focus, Useful Expressions, and Study Plan. Keep the workflow local-first, avoid Obsidian/Anki/spaced-repetition additions unless requested, and select only genuinely transferable expressions."
+

@@ -1,0 +1,13 @@
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+work/
+tmp/
+*.mp3
+*.m4a
+*.wav
+*.flac
+*.mp4
+*.mov
+*.webm
