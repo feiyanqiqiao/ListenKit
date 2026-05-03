@@ -1,9 +1,9 @@
 ---
-name: foreign-listening-material
+name: listenkit
 description: Generate multilingual listening-study Markdown notes from URL or local audio by using the repository CLI for audio import, Apple Speech transcription, and draft rendering, then applying AI judgment to complete listening focus, useful expressions, and study plan sections.
 ---
 
-# Foreign Listening Material
+# ListenKit
 
 Use this skill when the user wants to turn a foreign-language audio/video URL, local audio file, or Audio Hijack recording into a Markdown listening-study note.
 
@@ -12,7 +12,7 @@ Use this skill when the user wants to turn a foreign-language audio/video URL, l
 1. Identify the input:
    - URL: use `cli/import-audio.sh --url`
    - local audio or Audio Hijack recording: use `cli/import-audio.sh --input`
-2. Transcribe with `cli/transcribe-audio.sh --engine apple --locale <bcp47>`.
+2. Transcribe with `cli/transcribe-audio.sh --locale <bcp47>`. Use `--engine apple` only when the user explicitly wants Apple Speech.
 3. Render a draft note with `cli/render-listening-note.py`.
 4. Read the transcript and complete only:
    - `## Listening Focus`
@@ -36,4 +36,3 @@ cli/import-audio.sh --url "https://example.com/video" --output-dir work/audio --
 cli/transcribe-audio.sh --audio-path work/audio/clip.m4a --locale ja-JP --output work/clip.json
 cli/render-listening-note.py --audio-path work/audio/clip.m4a --transcript-json work/clip.json --title "Clip" --language Japanese --output work/clip.md
 ```
-

@@ -8,9 +8,41 @@ brew install yt-dlp ffmpeg
 
 Python 3.10+ is required for `cli/render-listening-note.py` and tests.
 
+## faster-whisper Backend
+
+The default ASR backend is `faster-whisper`:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install faster-whisper
+export FASTER_WHISPER_PYTHON="$PWD/.venv/bin/python"
+```
+
+ListenKit calls:
+
+```bash
+cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP
+```
+
+Default settings:
+
+- model: `small`
+- device: `cpu`
+- compute type: `int8`
+- beam size: `5`
+
+This is the recommended starting point for an 8 GB Mac. The first run may download the model and take significantly longer than later cached runs.
+
+Common faster-whisper failures:
+
+- `FASTER_WHISPER_PYTHON` is not set
+- `faster-whisper` is not installed in that Python environment
+- model download is blocked or incomplete
+- the audio file is missing or unreadable
+
 ## Apple Speech Backend
 
-v1 uses Apple Speech as the only implemented ASR backend.
+Apple Speech is an optional backend.
 
 `cli/transcribe-audio.sh` expects an executable helper at:
 
@@ -22,7 +54,7 @@ You can also point to an external helper:
 
 ```bash
 APPLE_SPEECH_HELPER=/path/to/run-apple-speech-helper.sh \
-  cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP
+  cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP --engine apple
 ```
 
 The helper contract is:

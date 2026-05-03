@@ -1,4 +1,4 @@
-# foreign-listening-material
+# ListenKit
 
 Local-first multilingual listening-material generator, with optional agent adapters.
 
@@ -33,7 +33,8 @@ Output:
 
 ## Requirements
 
-- macOS for the Apple Speech v1 backend
+- Python environment with `faster-whisper` for the default local ASR backend
+- macOS for the optional Apple Speech backend
 - `yt-dlp` for URL import
 - `ffmpeg` for audio conversion
 - Python 3.10+ for Markdown rendering and tests
@@ -42,6 +43,9 @@ Install common dependencies:
 
 ```bash
 brew install yt-dlp ffmpeg
+python3 -m venv .venv
+.venv/bin/pip install faster-whisper
+export FASTER_WHISPER_PYTHON="$PWD/.venv/bin/python"
 ```
 
 ## Quick Example
@@ -65,7 +69,7 @@ cli/render-listening-note.py \
   --output work/sample-note.md
 ```
 
-If your Apple Speech helper lives outside this repository, set `APPLE_SPEECH_HELPER=/path/to/helper`.
+The default backend is `faster-whisper small` on CPU with `int8` compute. This is the recommended starting point for an 8 GB Mac. To use Apple Speech instead, pass `--engine apple`; if your Apple Speech helper lives outside this repository, set `APPLE_SPEECH_HELPER=/path/to/helper`.
 
 Then ask your agent or editor to fill `Listening Focus`, `Useful Expressions`, and `Study Plan` using the adapter instructions.
 

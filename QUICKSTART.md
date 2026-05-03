@@ -28,13 +28,17 @@ Use this path for Audio Hijack recordings or any existing local audio file.
 ## 3. Transcribe
 
 ```bash
+python3 -m venv .venv
+.venv/bin/pip install faster-whisper
+export FASTER_WHISPER_PYTHON="$PWD/.venv/bin/python"
+
 cli/transcribe-audio.sh \
   --audio-path work/audio/recording.m4a \
   --locale en-US \
   --output work/recording-transcript.json
 ```
 
-v1 expects an Apple Speech helper at `tools/apple-speech-helper/run-apple-speech-helper.sh`. See `INSTALL.md`.
+The default backend is `faster-whisper small` with CPU `int8`, which is the recommended local option for an 8 GB Mac. Use `--engine apple` if you want the optional Apple Speech backend. See `INSTALL.md`.
 
 ## 4. Render Markdown
 
@@ -56,4 +60,3 @@ Use one adapter:
 - Cursor: `adapters/cursor/foreign-listening.md`
 
 Ask the agent to complete `Listening Focus`, `Useful Expressions`, and `Study Plan` without adding long-term review systems.
-
