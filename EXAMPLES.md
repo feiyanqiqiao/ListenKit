@@ -2,6 +2,8 @@
 
 The examples in this repository are synthetic and safe to redistribute.
 
+No sample audio files are bundled. In the render-only examples below, `--audio-path` is recorded as source metadata in the Markdown note; it does not need to exist for the renderer to run.
+
 ## Japanese Sample
 
 ```bash
@@ -35,4 +37,3 @@ Every note contains:
 - `Study Plan`
 
 The renderer creates a draft. An agent or human should complete the learning analysis.
-

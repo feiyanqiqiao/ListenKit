@@ -83,6 +83,6 @@ All adapters call the same CLI. They should not reimplement import, transcriptio
 
 ## Privacy and Copyright
 
-The v1 transcription route is designed for local Apple Speech. The AI editing stage may send transcript text to the model provider you use. Only process material you have the right to use.
+The default transcription route uses local `faster-whisper`; the first run may download model files. Apple Speech is available as an optional local macOS backend. The AI editing stage may send transcript text to the model provider you use. Only process material you have the right to use.
 
 See `PRIVACY_AND_COPYRIGHT.md`.

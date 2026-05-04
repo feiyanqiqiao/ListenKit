@@ -2,7 +2,9 @@
 
 ## Local Processing
 
-The v1 ASR route is designed around local Apple Speech. Audio transcription should happen on the local Mac when the Apple helper is used.
+The default ASR route uses `faster-whisper` for local inference. Audio transcription happens on your machine, but the first run may download model files unless they are already cached locally.
+
+Apple Speech is an optional local backend on macOS. When the Apple helper is used, audio transcription also happens on the local Mac.
 
 ## AI Editing
 
@@ -15,4 +17,3 @@ This project does not include copyrighted audio, transcripts, textbook content, 
 You are responsible for ensuring you have the right to download, record, transcribe, and study any source material you process.
 
 Do not use this project to redistribute copyrighted transcripts or audio.
-
