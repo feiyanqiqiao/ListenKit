@@ -1,6 +1,6 @@
 ---
 name: listenkit
-description: Generate multilingual listening-study Markdown notes from URL or local audio by using the repository CLI for audio import, Apple Speech transcription, and draft rendering, then applying AI judgment to complete listening focus, useful expressions, and study plan sections.
+description: Generate multilingual listening-study Markdown notes from URL or local audio by using the repository CLI for audio import, local ASR transcription, and draft rendering, then applying AI judgment to complete listening focus, useful expressions, and study plan sections.
 ---
 
 # ListenKit

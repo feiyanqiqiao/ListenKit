@@ -51,6 +51,72 @@ class ImportAudioTests(unittest.TestCase):
             self.assertIn(str(source), argv)
             self.assertIn(str(out_dir / "capture.m4a"), argv)
 
+    def test_local_input_same_output_path_is_noop(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            source = Path(tmpdir) / "recording.m4a"
+            bin_dir.mkdir()
+            source.write_bytes(b"fake")
+            (bin_dir / "ffmpeg").write_text(
+                "#!/usr/bin/env bash\necho 'ffmpeg should not run' >&2\nexit 99\n",
+                encoding="utf-8",
+            )
+            os.chmod(bin_dir / "ffmpeg", 0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            result = subprocess.run(
+                [
+                    str(IMPORT_SCRIPT),
+                    "--input",
+                    str(source),
+                    "--output-dir",
+                    tmpdir,
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(source))
+            self.assertEqual(result.stderr, "")
+
+    def test_local_input_surfaces_ffmpeg_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            out_dir = Path(tmpdir) / "out"
+            source = Path(tmpdir) / "recording.wav"
+            bin_dir.mkdir()
+            source.write_bytes(b"fake")
+            (bin_dir / "ffmpeg").write_text(
+                "#!/usr/bin/env bash\necho 'mock ffmpeg failure' >&2\nexit 42\n",
+                encoding="utf-8",
+            )
+            os.chmod(bin_dir / "ffmpeg", 0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            result = subprocess.run(
+                [
+                    str(IMPORT_SCRIPT),
+                    "--input",
+                    str(source),
+                    "--output-dir",
+                    str(out_dir),
+                    "--base-name",
+                    "capture",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("mock ffmpeg failure", result.stderr)
+
     def test_url_mode_uses_no_playlist_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bin_dir = Path(tmpdir) / "bin"

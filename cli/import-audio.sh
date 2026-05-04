@@ -113,7 +113,20 @@ if [[ -n "$input_path" ]]; then
   fi
 
   output_path="${output_dir%/}/${base_name}.${audio_format}"
-  ffmpeg -y -i "$input_path" -vn "$output_path" >/dev/null 2>&1
+  input_abs="$(cd "$(dirname "$input_path")" && pwd -P)/$(basename "$input_path")"
+  output_abs="$(cd "$(dirname "$output_path")" && pwd -P)/$(basename "$output_path")"
+  if [[ "$input_abs" == "$output_abs" ]]; then
+    printf '%s\n' "$output_path"
+    exit 0
+  fi
+
+  ffmpeg_log="$(mktemp)"
+  if ! ffmpeg -y -i "$input_path" -vn "$output_path" >/dev/null 2>"$ffmpeg_log"; then
+    cat "$ffmpeg_log" >&2
+    rm -f "$ffmpeg_log"
+    exit 1
+  fi
+  rm -f "$ffmpeg_log"
   printf '%s\n' "$output_path"
   exit 0
 fi
@@ -156,4 +169,3 @@ fi
 
 command+=("$url")
 "${command[@]}"
-

@@ -1,5 +1,5 @@
 {
-  "engine": "apple",
+  "engine": "faster-whisper",
   "locale": "en-US",
   "language": "English",
   "full_text": "Today I want to talk about a small library near my office. It is quiet in the morning, so I often stop there before work. If you need a place to focus, it is a good option.",
