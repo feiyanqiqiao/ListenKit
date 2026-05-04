@@ -27,6 +27,14 @@ base_name=""
 audio_format="m4a"
 playlist_mode="false"
 
+validate_base_name() {
+  local value="$1"
+  if [[ -z "$value" || "$value" == "." || "$value" == ".." || "$value" == *"/"* || "$value" == *"\\"* ]]; then
+    echo "--base-name must be a filename stem, not a path: $value" >&2
+    exit 1
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --url)
@@ -93,6 +101,10 @@ case "$audio_format" in
     exit 1
     ;;
 esac
+
+if [[ -n "$base_name" ]]; then
+  validate_base_name "$base_name"
+fi
 
 mkdir -p "$output_dir"
 

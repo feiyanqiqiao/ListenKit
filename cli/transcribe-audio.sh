@@ -74,12 +74,43 @@ fi
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 
+reject_error_payload() {
+  local payload_path="$1"
+  python3 - "$payload_path" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+try:
+    with open(path, encoding="utf-8") as handle:
+        payload = json.load(handle)
+except Exception:
+    sys.exit(0)
+
+error = payload.get("error") if isinstance(payload, dict) else None
+if not error:
+    sys.exit(0)
+
+if isinstance(error, dict):
+    error_type = error.get("type", "error")
+    message = error.get("message", "transcription failed")
+    print(f"ASR backend returned error: {error_type}: {message}", file=sys.stderr)
+else:
+    print(f"ASR backend returned error: {error}", file=sys.stderr)
+sys.exit(1)
+PY
+}
+
 run_and_write() {
   if [[ -n "$output_path" ]]; then
     mkdir -p "$(dirname "$output_path")"
     local temp_output
     temp_output="$(mktemp)"
     if "$@" > "$temp_output"; then
+      if ! reject_error_payload "$temp_output"; then
+        rm -f "$temp_output"
+        return 1
+      fi
       mv "$temp_output" "$output_path"
       printf '%s\n' "$output_path"
     else
@@ -88,7 +119,20 @@ run_and_write() {
       return "$status"
     fi
   else
-    "$@"
+    local temp_output
+    temp_output="$(mktemp)"
+    if "$@" > "$temp_output"; then
+      if ! reject_error_payload "$temp_output"; then
+        rm -f "$temp_output"
+        return 1
+      fi
+      cat "$temp_output"
+      rm -f "$temp_output"
+    else
+      local status=$?
+      rm -f "$temp_output"
+      return "$status"
+    fi
   fi
 }
 

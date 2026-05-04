@@ -117,6 +117,48 @@ class ImportAudioTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("mock ffmpeg failure", result.stderr)
 
+    def test_rejects_base_name_with_parent_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "recording.wav"
+            source.write_bytes(b"fake")
+            result = subprocess.run(
+                [
+                    str(IMPORT_SCRIPT),
+                    "--input",
+                    str(source),
+                    "--output-dir",
+                    str(Path(tmpdir) / "out"),
+                    "--base-name",
+                    "../escape",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--base-name must be a filename stem", result.stderr)
+
+    def test_rejects_base_name_with_nested_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = subprocess.run(
+                [
+                    str(IMPORT_SCRIPT),
+                    "--url",
+                    "https://example.com/video",
+                    "--output-dir",
+                    str(Path(tmpdir) / "out"),
+                    "--base-name",
+                    "nested/clip",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--base-name must be a filename stem", result.stderr)
+
     def test_url_mode_uses_no_playlist_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bin_dir = Path(tmpdir) / "bin"
