@@ -151,12 +151,16 @@ fi
 
 command=(
   yt-dlp
+  --quiet
+  --no-warnings
   --extract-audio
   --audio-format "$audio_format"
   --audio-quality 0
   --add-metadata
   --embed-metadata
   --no-mtime
+  --print
+  "after_move:filepath"
   --paths "$output_dir"
   --output "$template"
 )

@@ -125,7 +125,7 @@ class ImportAudioTests(unittest.TestCase):
             bin_dir.mkdir()
             (bin_dir / "ffmpeg").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             (bin_dir / "yt-dlp").write_text(
-                "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$ARGV_LOG\"\n",
+                "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$ARGV_LOG\"\nprintf '%s\\n' \"$YTDLP_OUTPUT\"\n",
                 encoding="utf-8",
             )
             os.chmod(bin_dir / "ffmpeg", 0o755)
@@ -134,6 +134,7 @@ class ImportAudioTests(unittest.TestCase):
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env['PATH']}"
             env["ARGV_LOG"] = str(log)
+            env["YTDLP_OUTPUT"] = str(out_dir / "clip.m4a")
             result = subprocess.run(
                 [
                     str(IMPORT_SCRIPT),
@@ -151,7 +152,12 @@ class ImportAudioTests(unittest.TestCase):
                 env=env,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(out_dir / "clip.m4a"))
             argv = log.read_text(encoding="utf-8")
+            self.assertIn("--quiet", argv)
+            self.assertIn("--no-warnings", argv)
+            self.assertIn("--print", argv)
+            self.assertIn("after_move:filepath", argv)
             self.assertIn("--no-playlist", argv)
             self.assertIn("clip.%(ext)s", argv)
 

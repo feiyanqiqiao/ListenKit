@@ -32,7 +32,7 @@ Use this skill when the user wants to turn a foreign-language audio/video URL, l
 ## CLI Examples
 
 ```bash
-cli/import-audio.sh --url "https://example.com/video" --output-dir work/audio --base-name clip
-cli/transcribe-audio.sh --audio-path work/audio/clip.m4a --locale ja-JP --output work/clip.json
-cli/render-listening-note.py --audio-path work/audio/clip.m4a --transcript-json work/clip.json --title "Clip" --language Japanese --output work/clip.md
+audio_path=$(cli/import-audio.sh --url "https://example.com/video" --output-dir work/audio --base-name clip)
+cli/transcribe-audio.sh --audio-path "$audio_path" --locale ja-JP --output work/clip.json
+cli/render-listening-note.py --audio-path "$audio_path" --transcript-json work/clip.json --title "Clip" --language Japanese --output work/clip.md
 ```

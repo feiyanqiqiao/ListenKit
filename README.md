@@ -51,18 +51,18 @@ export FASTER_WHISPER_PYTHON="$PWD/.venv/bin/python"
 ## Quick Example
 
 ```bash
-cli/import-audio.sh \
+audio_path=$(cli/import-audio.sh \
   --url "https://example.com/video" \
   --output-dir work/audio \
-  --base-name sample
+  --base-name sample)
 
 cli/transcribe-audio.sh \
-  --audio-path work/audio/sample.m4a \
+  --audio-path "$audio_path" \
   --locale ja-JP \
   --output work/sample-transcript.json
 
 cli/render-listening-note.py \
-  --audio-path work/audio/sample.m4a \
+  --audio-path "$audio_path" \
   --transcript-json work/sample-transcript.json \
   --title "Sample Listening Note" \
   --language Japanese \
