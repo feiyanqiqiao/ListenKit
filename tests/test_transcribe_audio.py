@@ -143,10 +143,10 @@ class TranscribeAudioTests(unittest.TestCase):
             )
             helper.chmod(0o755)
             for name, target in {
+                "awk": "/usr/bin/awk",
                 "bash": "/bin/bash",
                 "cat": "/bin/cat",
                 "dirname": "/usr/bin/dirname",
-                "grep": "/usr/bin/grep",
                 "mkdir": "/bin/mkdir",
                 "mktemp": "/usr/bin/mktemp",
                 "mv": "/bin/mv",
@@ -189,6 +189,55 @@ class TranscribeAudioTests(unittest.TestCase):
             helper.write_text(
                 "#!/usr/bin/env bash\n"
                 "printf '{\"error\":{\"type\":\"mock_error\",\"message\":\"failed\"},\"engine\":\"apple\",\"locale\":\"ja-JP\",\"full_text\":\"\",\"segments\":[],\"timing_complete\":false}\\n'\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+            env = os.environ.copy()
+            env["APPLE_SPEECH_HELPER"] = str(helper)
+            result = subprocess.run(
+                [
+                    str(TRANSCRIBE_SCRIPT),
+                    "--audio-path",
+                    str(audio),
+                    "--locale",
+                    "ja-JP",
+                    "--engine",
+                    "apple",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("ASR backend returned error", result.stderr)
+            self.assertIn("mock_error", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_pretty_printed_helper_error_payload_fails_even_with_zero_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.m4a"
+            helper = Path(tmpdir) / "helper.sh"
+            output = Path(tmpdir) / "transcript.json"
+            audio.write_bytes(b"fake")
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "cat <<'EOF'\n"
+                "{\n"
+                "  \"error\": {\n"
+                "    \"type\": \"mock_error\",\n"
+                "    \"message\": \"failed\"\n"
+                "  },\n"
+                "  \"engine\": \"apple\",\n"
+                "  \"locale\": \"ja-JP\",\n"
+                "  \"full_text\": \"\",\n"
+                "  \"segments\": [],\n"
+                "  \"timing_complete\": false\n"
+                "}\n"
+                "EOF\n",
                 encoding="utf-8",
             )
             helper.chmod(0o755)

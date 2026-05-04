@@ -76,7 +76,19 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 
 reject_error_payload() {
   local payload_path="$1"
-  if grep -Eq '^[[:space:]]*\{[[:space:]]*"error"[[:space:]]*:' "$payload_path"; then
+  if awk '
+    {
+      gsub(/[[:space:]]/, "", $0)
+      compact = compact $0
+      if (length(compact) >= 9) {
+        found = compact ~ /^\{"error":/
+        exit
+      }
+    }
+    END {
+      exit found ? 0 : 1
+    }
+  ' "$payload_path"; then
     echo "ASR backend returned error payload." >&2
     cat "$payload_path" >&2
     return 1
