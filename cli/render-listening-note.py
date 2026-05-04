@@ -25,6 +25,14 @@ def load_transcript(path: Path) -> dict[str, Any]:
     except json.JSONDecodeError as exc:
         raise SystemExit(f"Invalid transcript JSON: {path}: {exc}") from exc
 
+    if payload.get("error"):
+        error = payload["error"]
+        if isinstance(error, dict):
+            error_type = error.get("type", "error")
+            message = error.get("message", "transcription failed")
+            raise SystemExit(f"Transcript JSON contains ASR error: {error_type}: {message}")
+        raise SystemExit(f"Transcript JSON contains ASR error: {error}")
+
     required = ["engine", "locale", "full_text", "segments", "timing_complete"]
     missing = [key for key in required if key not in payload]
     if missing:
@@ -114,4 +122,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

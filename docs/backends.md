@@ -35,6 +35,19 @@ The helper must return:
 - `segments`
 - `timing_complete`
 
+If a backend fails after producing JSON, it should return an `error` object:
+
+```json
+{
+  "error": {
+    "type": "backend_error",
+    "message": "human-readable failure reason"
+  }
+}
+```
+
+An error payload is terminal. Renderers and adapters must not turn it into a study note; they should surface the error and ask the user to fix the backend or rerun transcription.
+
 ## Future Backends
 
 Potential future engines:

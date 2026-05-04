@@ -85,6 +85,48 @@ class RenderListeningNoteTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing required keys", result.stderr)
 
+    def test_rejects_transcript_error_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bad_json = Path(tmpdir) / "error.json"
+            output = Path(tmpdir) / "note.md"
+            bad_json.write_text(
+                json.dumps(
+                    {
+                        "error": {"type": "mock_error", "message": "transcription failed"},
+                        "engine": "faster-whisper",
+                        "locale": "ja-JP",
+                        "full_text": "",
+                        "segments": [],
+                        "timing_complete": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(RENDER_SCRIPT),
+                    "--audio-path",
+                    str(Path(tmpdir) / "sample.m4a"),
+                    "--transcript-json",
+                    str(bad_json),
+                    "--title",
+                    "Bad",
+                    "--language",
+                    "Japanese",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Transcript JSON contains ASR error", result.stderr)
+            self.assertIn("mock_error", result.stderr)
+            self.assertFalse(output.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
