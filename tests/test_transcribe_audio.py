@@ -128,6 +128,58 @@ class TranscribeAudioTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), str(output))
             self.assertIn('"full_text":"ok"', output.read_text(encoding="utf-8"))
 
+    def test_apple_helper_can_be_used_without_python3_on_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.m4a"
+            helper = Path(tmpdir) / "helper.sh"
+            output = Path(tmpdir) / "transcript.json"
+            bin_dir = Path(tmpdir) / "bin"
+            bin_dir.mkdir()
+            audio.write_bytes(b"fake")
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '{\"engine\":\"apple\",\"locale\":\"ja-JP\",\"full_text\":\"ok\",\"segments\":[],\"timing_complete\":true}\\n'\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+            for name, target in {
+                "bash": "/bin/bash",
+                "cat": "/bin/cat",
+                "dirname": "/usr/bin/dirname",
+                "grep": "/usr/bin/grep",
+                "mkdir": "/bin/mkdir",
+                "mktemp": "/usr/bin/mktemp",
+                "mv": "/bin/mv",
+                "rm": "/bin/rm",
+            }.items():
+                (bin_dir / name).symlink_to(target)
+
+            env = {
+                "APPLE_SPEECH_HELPER": str(helper),
+                "PATH": str(bin_dir),
+            }
+            result = subprocess.run(
+                [
+                    str(TRANSCRIBE_SCRIPT),
+                    "--audio-path",
+                    str(audio),
+                    "--locale",
+                    "ja-JP",
+                    "--engine",
+                    "apple",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(output))
+            self.assertIn('"full_text":"ok"', output.read_text(encoding="utf-8"))
+
     def test_helper_error_payload_fails_even_with_zero_exit(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             audio = Path(tmpdir) / "sample.m4a"

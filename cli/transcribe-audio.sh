@@ -76,29 +76,12 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 
 reject_error_payload() {
   local payload_path="$1"
-  python3 - "$payload_path" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-try:
-    with open(path, encoding="utf-8") as handle:
-        payload = json.load(handle)
-except Exception:
-    sys.exit(0)
-
-error = payload.get("error") if isinstance(payload, dict) else None
-if not error:
-    sys.exit(0)
-
-if isinstance(error, dict):
-    error_type = error.get("type", "error")
-    message = error.get("message", "transcription failed")
-    print(f"ASR backend returned error: {error_type}: {message}", file=sys.stderr)
-else:
-    print(f"ASR backend returned error: {error}", file=sys.stderr)
-sys.exit(1)
-PY
+  if grep -Eq '^[[:space:]]*\{[[:space:]]*"error"[[:space:]]*:' "$payload_path"; then
+    echo "ASR backend returned error payload." >&2
+    cat "$payload_path" >&2
+    return 1
+  fi
+  return 0
 }
 
 run_and_write() {
