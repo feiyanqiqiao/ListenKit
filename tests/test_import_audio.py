@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -78,6 +79,35 @@ class ImportAudioTests(unittest.TestCase):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(source))
+            self.assertEqual(result.stderr, "")
+
+    def test_local_input_same_output_path_does_not_require_ffmpeg(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            source = Path(tmpdir) / "recording.m4a"
+            bin_dir.mkdir()
+            source.write_bytes(b"fake")
+            for name in ["bash", "basename", "dirname", "mkdir"]:
+                target = shutil.which(name)
+                self.assertIsNotNone(target, f"Missing test dependency: {name}")
+                (bin_dir / name).symlink_to(target)
+
+            result = subprocess.run(
+                [
+                    str(IMPORT_SCRIPT),
+                    "--input",
+                    str(source),
+                    "--output-dir",
+                    tmpdir,
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={"PATH": str(bin_dir)},
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.strip(), str(source))

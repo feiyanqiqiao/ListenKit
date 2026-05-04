@@ -113,11 +113,6 @@ if [[ -n "$input_path" ]]; then
     echo "Input audio file not found: $input_path" >&2
     exit 1
   fi
-  if ! command -v ffmpeg >/dev/null 2>&1; then
-    echo "Missing required command: ffmpeg" >&2
-    echo "Install it first, for example: brew install ffmpeg" >&2
-    exit 1
-  fi
 
   if [[ -z "$base_name" ]]; then
     base_name="$(basename "$input_path")"
@@ -130,6 +125,12 @@ if [[ -n "$input_path" ]]; then
   if [[ "$input_abs" == "$output_abs" ]]; then
     printf '%s\n' "$output_path"
     exit 0
+  fi
+
+  if ! command -v ffmpeg >/dev/null 2>&1; then
+    echo "Missing required command: ffmpeg" >&2
+    echo "Install it first, for example: brew install ffmpeg" >&2
+    exit 1
   fi
 
   ffmpeg_log="$(mktemp)"
