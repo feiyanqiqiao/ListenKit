@@ -233,6 +233,94 @@ class ImportAudioTests(unittest.TestCase):
             self.assertIn("--no-playlist", argv)
             self.assertIn("clip.%(ext)s", argv)
 
+    def test_url_mode_supports_sidecars_quality_template_and_flac(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            out_dir = Path(tmpdir) / "out"
+            log = Path(tmpdir) / "argv.log"
+            bin_dir.mkdir()
+            (bin_dir / "ffmpeg").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (bin_dir / "yt-dlp").write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$ARGV_LOG\"\nprintf '%s\\n' \"$YTDLP_OUTPUT\"\n",
+                encoding="utf-8",
+            )
+            os.chmod(bin_dir / "ffmpeg", 0o755)
+            os.chmod(bin_dir / "yt-dlp", 0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["ARGV_LOG"] = str(log)
+            env["YTDLP_OUTPUT"] = str(out_dir / "lesson.flac")
+            result = subprocess.run(
+                [
+                    str(IMPORT_SCRIPT),
+                    "--url",
+                    "https://example.com/video",
+                    "--output-dir",
+                    str(out_dir),
+                    "--format",
+                    "flac",
+                    "--quality",
+                    "5",
+                    "--filename-template",
+                    "%(id)s.%(ext)s",
+                    "--write-info-json",
+                    "--write-thumbnail",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(out_dir / "lesson.flac"))
+            argv = log.read_text(encoding="utf-8")
+            self.assertIn("--audio-format\nflac", argv)
+            self.assertIn("--audio-quality\n5", argv)
+            self.assertIn("%(id)s.%(ext)s", argv)
+            self.assertIn("--write-info-json", argv)
+            self.assertIn("--write-thumbnail", argv)
+
+    def test_url_playlist_mode_allows_multiple_output_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            out_dir = Path(tmpdir) / "out"
+            log = Path(tmpdir) / "argv.log"
+            bin_dir.mkdir()
+            (bin_dir / "ffmpeg").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (bin_dir / "yt-dlp").write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" > \"$ARGV_LOG\"\nprintf '%s\\n%s\\n' \"$YTDLP_OUTPUT_ONE\" \"$YTDLP_OUTPUT_TWO\"\n",
+                encoding="utf-8",
+            )
+            os.chmod(bin_dir / "ffmpeg", 0o755)
+            os.chmod(bin_dir / "yt-dlp", 0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["ARGV_LOG"] = str(log)
+            env["YTDLP_OUTPUT_ONE"] = str(out_dir / "one.m4a")
+            env["YTDLP_OUTPUT_TWO"] = str(out_dir / "two.m4a")
+            result = subprocess.run(
+                [
+                    str(IMPORT_SCRIPT),
+                    "--url",
+                    "https://example.com/playlist",
+                    "--output-dir",
+                    str(out_dir),
+                    "--playlist",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), [str(out_dir / "one.m4a"), str(out_dir / "two.m4a")])
+            argv = log.read_text(encoding="utf-8")
+            self.assertIn("--yes-playlist", argv)
+
 
 if __name__ == "__main__":
     unittest.main()

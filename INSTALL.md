@@ -8,6 +8,8 @@ brew install yt-dlp ffmpeg
 
 Python 3.10+ is required for `cli/render-listening-note.py` and tests.
 
+The optional Apple Speech backend requires macOS with Speech APIs and Xcode command line tools for the bundled Swift helper build.
+
 ## faster-whisper Backend
 
 The default ASR backend is `faster-whisper`:
@@ -42,15 +44,21 @@ Common faster-whisper failures:
 
 ## Apple Speech Backend
 
-Apple Speech is an optional backend.
+Apple Speech is an optional local macOS backend. ListenKit bundles a small helper app that is built on first use and launched through `/usr/bin/open` so macOS can show Speech permission prompts.
 
-`cli/transcribe-audio.sh` expects an executable helper at:
+The default helper lives at:
 
 ```text
 tools/apple-speech-helper/run-apple-speech-helper.sh
 ```
 
-You can also point to an external helper:
+Use it with:
+
+```bash
+cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP --engine apple
+```
+
+You can still point to an external helper:
 
 ```bash
 APPLE_SPEECH_HELPER=/path/to/run-apple-speech-helper.sh \
@@ -82,6 +90,7 @@ Common Apple Speech failures:
 - Locale not supported on the current Mac
 - Required speech assets are not installed
 - Audio file path is missing or unreadable
+- Xcode command line tools or the macOS SDK are missing
 
 ## Audio Hijack
 

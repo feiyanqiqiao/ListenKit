@@ -5,7 +5,7 @@
 Two local ASR backends are supported:
 
 - `faster-whisper` is the default
-- `apple` is optional and requires an external Apple Speech helper
+- `apple` is optional and uses the bundled Apple Speech helper by default
 
 The default CLI boundary is:
 
@@ -27,7 +27,9 @@ Apple Speech can be forced with:
 cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> --engine apple
 ```
 
-The helper must return:
+The bundled helper is built from `tools/apple-speech-helper/` on first use. It launches a local macOS app through `/usr/bin/open` so Speech permission prompts can be shown. Set `APPLE_SPEECH_HELPER=/path/to/helper` only when you want to override the bundled helper.
+
+Any helper must return:
 
 - `engine`
 - `locale`

@@ -38,6 +38,7 @@ Output:
 - `yt-dlp` for URL import
 - `ffmpeg` for audio conversion
 - Python 3.10+ for Markdown rendering and tests
+- Xcode command line tools for the optional Apple Speech helper build
 
 Install common dependencies:
 
@@ -54,7 +55,8 @@ export FASTER_WHISPER_PYTHON="$PWD/.venv/bin/python"
 audio_path=$(cli/import-audio.sh \
   --url "https://example.com/video" \
   --output-dir work/audio \
-  --base-name sample)
+  --base-name sample \
+  --format mp3)
 
 cli/transcribe-audio.sh \
   --audio-path "$audio_path" \
@@ -69,7 +71,7 @@ cli/render-listening-note.py \
   --output work/sample-note.md
 ```
 
-The default backend is `faster-whisper small` on CPU with `int8` compute. This is the recommended starting point for an 8 GB Mac. To use Apple Speech instead, pass `--engine apple`; if your Apple Speech helper lives outside this repository, set `APPLE_SPEECH_HELPER=/path/to/helper`.
+The default backend is `faster-whisper small` on CPU with `int8` compute. This is the recommended starting point for an 8 GB Mac. To use the bundled Apple Speech helper instead, pass `--engine apple`; if your Apple Speech helper lives outside this repository, set `APPLE_SPEECH_HELPER=/path/to/helper`.
 
 Then ask your agent or editor to fill `Listening Focus`, `Useful Expressions`, and `Study Plan` using the adapter instructions.
 
@@ -80,6 +82,8 @@ Then ask your agent or editor to fill `Listening Focus`, `Useful Expressions`, a
 - Cursor: `adapters/cursor/foreign-listening.md`
 
 All adapters call the same CLI. They should not reimplement import, transcription, or rendering logic.
+
+`cli/import-audio.sh` can also save URL sidecars with `--write-info-json` and `--write-thumbnail`, use `--quality <value>`, and use a custom `--filename-template` when you need yt-dlp naming control.
 
 ## Privacy and Copyright
 

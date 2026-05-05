@@ -8,10 +8,11 @@ brew install yt-dlp ffmpeg
 audio_path=$(cli/import-audio.sh \
   --url "https://example.com/video" \
   --output-dir work/audio \
-  --base-name lesson-one)
+  --base-name lesson-one \
+  --format mp3)
 ```
 
-The command prints the imported audio path, which the example stores in `audio_path`. It defaults to single-item mode and passes `--no-playlist` to `yt-dlp`.
+The command prints the imported audio path, which the example stores in `audio_path`. It defaults to single-item mode and passes `--no-playlist` to `yt-dlp`. Add `--write-info-json` or `--write-thumbnail` when you want yt-dlp sidecar files.
 
 ## 2. Local Audio Input
 
@@ -38,7 +39,7 @@ cli/transcribe-audio.sh \
   --output work/recording-transcript.json
 ```
 
-The default backend is `faster-whisper small` with CPU `int8`, which is the recommended local option for an 8 GB Mac. Use `--engine apple` if you want the optional Apple Speech backend. See `INSTALL.md`.
+The default backend is `faster-whisper small` with CPU `int8`, which is the recommended local option for an 8 GB Mac. Use `--engine apple` if you want the bundled Apple Speech backend. See `INSTALL.md`.
 
 ## 4. Render Markdown
 

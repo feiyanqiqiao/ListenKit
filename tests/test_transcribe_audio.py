@@ -10,6 +10,11 @@ TRANSCRIBE_SCRIPT = REPO_ROOT / "cli" / "transcribe-audio.sh"
 
 
 class TranscribeAudioTests(unittest.TestCase):
+    def test_default_apple_helper_is_bundled(self) -> None:
+        helper = REPO_ROOT / "tools" / "apple-speech-helper" / "run-apple-speech-helper.sh"
+        self.assertTrue(helper.is_file())
+        self.assertTrue(os.access(helper, os.X_OK))
+
     def test_rejects_unsupported_engine(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             audio = Path(tmpdir) / "sample.m4a"
