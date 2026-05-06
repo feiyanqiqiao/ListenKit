@@ -1,5 +1,5 @@
 version: 1
 metadata:
-  display_name: "ListenKit"
-  short_description: "Turn multilingual audio or video into Markdown listening-study notes."
-  default_prompt: "Use $listenkit to import audio from a URL or local file, transcribe it with the repository CLI, render a plain Markdown draft, then complete Listening Focus, Useful Expressions, and Study Plan. Keep the workflow local-first, avoid Obsidian/Anki/spaced-repetition additions unless requested, and select only genuinely transferable expressions."
+  display_name: "Generate Markdown"
+  short_description: "Generate plain transcript Markdown from an existing ListenKit transcript JSON file."
+  default_prompt: "Use $generate-markdown to render an existing ListenKit transcript JSON file as plain transcript Markdown with cli/render-listening-note.py. Do not import audio, download media, run ASR transcription, or add learning-note templates, Obsidian, Anki, or review-system structures unless a downstream project explicitly asks."
