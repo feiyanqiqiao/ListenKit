@@ -3,6 +3,7 @@ import tempfile
 import unittest
 import os
 from pathlib import Path
+from typing import Optional
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +11,19 @@ TRANSCRIBE_SCRIPT = REPO_ROOT / "cli" / "transcribe-audio.sh"
 
 
 class TranscribeAudioTests(unittest.TestCase):
+    def write_fake_python(self, path: Path, log_path: Optional[Path] = None) -> None:
+        log_line = f"printf '%s\\n' \"$0 $*\" >> {str(log_path)!r}\n" if log_path else ""
+        path.write_text(
+            "#!/usr/bin/env bash\n"
+            f"{log_line}"
+            "if [[ \"$1\" == \"-c\" ]]; then\n"
+            "  exit 0\n"
+            "fi\n"
+            "exec /bin/sh \"$@\"\n",
+            encoding="utf-8",
+        )
+        path.chmod(0o755)
+
     def test_default_apple_helper_is_bundled(self) -> None:
         helper = REPO_ROOT / "tools" / "apple-speech-helper" / "run-apple-speech-helper.sh"
         self.assertTrue(helper.is_file())
@@ -37,12 +51,14 @@ class TranscribeAudioTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Unsupported engine", result.stderr)
 
-    def test_missing_faster_whisper_python_returns_clear_error(self) -> None:
+    def test_missing_faster_whisper_environment_without_auto_init_returns_clear_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             audio = Path(tmpdir) / "sample.m4a"
             audio.write_bytes(b"fake")
             env = os.environ.copy()
             env.pop("FASTER_WHISPER_PYTHON", None)
+            env.pop("LISTENKIT_AUTO_INIT", None)
+            env["LISTENKIT_FASTER_WHISPER_VENV_PYTHON"] = str(Path(tmpdir) / "missing-python")
             result = subprocess.run(
                 [
                     str(TRANSCRIBE_SCRIPT),
@@ -58,14 +74,18 @@ class TranscribeAudioTests(unittest.TestCase):
                 env=env,
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("FASTER_WHISPER_PYTHON is required", result.stderr)
+            self.assertIn("faster-whisper is not initialized", result.stderr)
+            self.assertIn("--auto-init", result.stderr)
+            self.assertIn("cli/init-faster-whisper.sh", result.stderr)
 
     def test_default_faster_whisper_helper_can_be_mocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             audio = Path(tmpdir) / "sample.m4a"
             helper = Path(tmpdir) / "helper.sh"
             output = Path(tmpdir) / "transcript.json"
+            fake_python = Path(tmpdir) / "python"
             audio.write_bytes(b"fake")
+            self.write_fake_python(fake_python)
             helper.write_text(
                 "#!/usr/bin/env bash\n"
                 "printf '{\"engine\":\"faster-whisper\",\"model\":\"small\",\"compute_type\":\"int8\",\"locale\":\"ja-JP\",\"language\":\"ja\",\"full_text\":\"ok\",\"segments\":[],\"timing_complete\":true}\\n'\n",
@@ -73,7 +93,7 @@ class TranscribeAudioTests(unittest.TestCase):
             )
             helper.chmod(0o755)
             env = os.environ.copy()
-            env["FASTER_WHISPER_PYTHON"] = "/bin/sh"
+            env["FASTER_WHISPER_PYTHON"] = str(fake_python)
             env["LISTENKIT_FASTER_WHISPER_HELPER"] = str(helper)
             result = subprocess.run(
                 [
@@ -96,6 +116,209 @@ class TranscribeAudioTests(unittest.TestCase):
             rendered = output.read_text(encoding="utf-8")
             self.assertIn('"engine":"faster-whisper"', rendered)
             self.assertIn('"compute_type":"int8"', rendered)
+
+    def test_repo_local_venv_python_is_used_without_env_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.m4a"
+            helper = Path(tmpdir) / "helper.sh"
+            output = Path(tmpdir) / "transcript.json"
+            fake_python = Path(tmpdir) / "python"
+            init_script = Path(tmpdir) / "init.sh"
+            audio.write_bytes(b"fake")
+            self.write_fake_python(fake_python)
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '{\"engine\":\"faster-whisper\",\"locale\":\"ja-JP\",\"language\":\"ja\",\"full_text\":\"repo venv\",\"segments\":[],\"timing_complete\":true}\\n'\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+            init_script.write_text("#!/usr/bin/env bash\nexit 99\n", encoding="utf-8")
+            init_script.chmod(0o755)
+            env = os.environ.copy()
+            env.pop("FASTER_WHISPER_PYTHON", None)
+            env.pop("LISTENKIT_AUTO_INIT", None)
+            env["LISTENKIT_FASTER_WHISPER_VENV_PYTHON"] = str(fake_python)
+            env["LISTENKIT_INIT_FASTER_WHISPER"] = str(init_script)
+            env["LISTENKIT_FASTER_WHISPER_HELPER"] = str(helper)
+            result = subprocess.run(
+                [
+                    str(TRANSCRIBE_SCRIPT),
+                    "--audio-path",
+                    str(audio),
+                    "--locale",
+                    "ja-JP",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('"full_text":"repo venv"', output.read_text(encoding="utf-8"))
+
+    def test_auto_init_invokes_init_script_and_continues(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.m4a"
+            helper = Path(tmpdir) / "helper.sh"
+            output = Path(tmpdir) / "transcript.json"
+            fake_python = Path(tmpdir) / "python"
+            init_script = Path(tmpdir) / "init.sh"
+            marker = Path(tmpdir) / "init-called"
+            audio.write_bytes(b"fake")
+            self.write_fake_python(fake_python)
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '{\"engine\":\"faster-whisper\",\"locale\":\"ja-JP\",\"language\":\"ja\",\"full_text\":\"auto init\",\"segments\":[],\"timing_complete\":true}\\n'\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+            init_script.write_text(
+                "#!/usr/bin/env bash\n"
+                f"touch {str(marker)!r}\n"
+                f"printf '%s\\n' {str(fake_python)!r}\n",
+                encoding="utf-8",
+            )
+            init_script.chmod(0o755)
+            env = os.environ.copy()
+            env.pop("FASTER_WHISPER_PYTHON", None)
+            env.pop("LISTENKIT_AUTO_INIT", None)
+            env["LISTENKIT_FASTER_WHISPER_VENV_PYTHON"] = str(Path(tmpdir) / "missing-python")
+            env["LISTENKIT_INIT_FASTER_WHISPER"] = str(init_script)
+            env["LISTENKIT_FASTER_WHISPER_HELPER"] = str(helper)
+            result = subprocess.run(
+                [
+                    str(TRANSCRIBE_SCRIPT),
+                    "--audio-path",
+                    str(audio),
+                    "--locale",
+                    "ja-JP",
+                    "--output",
+                    str(output),
+                    "--auto-init",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(marker.exists())
+            self.assertIn('"full_text":"auto init"', output.read_text(encoding="utf-8"))
+
+    def test_auto_init_can_be_authorized_by_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.m4a"
+            helper = Path(tmpdir) / "helper.sh"
+            output = Path(tmpdir) / "transcript.json"
+            fake_python = Path(tmpdir) / "python"
+            init_script = Path(tmpdir) / "init.sh"
+            audio.write_bytes(b"fake")
+            self.write_fake_python(fake_python)
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '{\"engine\":\"faster-whisper\",\"locale\":\"ja-JP\",\"language\":\"ja\",\"full_text\":\"env init\",\"segments\":[],\"timing_complete\":true}\\n'\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+            init_script.write_text(
+                "#!/usr/bin/env bash\n"
+                f"printf '%s\\n' {str(fake_python)!r}\n",
+                encoding="utf-8",
+            )
+            init_script.chmod(0o755)
+            env = os.environ.copy()
+            env.pop("FASTER_WHISPER_PYTHON", None)
+            env["LISTENKIT_AUTO_INIT"] = "1"
+            env["LISTENKIT_FASTER_WHISPER_VENV_PYTHON"] = str(Path(tmpdir) / "missing-python")
+            env["LISTENKIT_INIT_FASTER_WHISPER"] = str(init_script)
+            env["LISTENKIT_FASTER_WHISPER_HELPER"] = str(helper)
+            result = subprocess.run(
+                [
+                    str(TRANSCRIBE_SCRIPT),
+                    "--audio-path",
+                    str(audio),
+                    "--locale",
+                    "ja-JP",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('"full_text":"env init"', output.read_text(encoding="utf-8"))
+
+    def test_faster_whisper_python_override_must_import_package(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.m4a"
+            fake_python = Path(tmpdir) / "python"
+            audio.write_bytes(b"fake")
+            fake_python.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
+            fake_python.chmod(0o755)
+            env = os.environ.copy()
+            env["FASTER_WHISPER_PYTHON"] = str(fake_python)
+            env["LISTENKIT_FASTER_WHISPER_VENV_PYTHON"] = str(Path(tmpdir) / "missing-python")
+            result = subprocess.run(
+                [
+                    str(TRANSCRIBE_SCRIPT),
+                    "--audio-path",
+                    str(audio),
+                    "--locale",
+                    "ja-JP",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("FASTER_WHISPER_PYTHON cannot import faster_whisper", result.stderr)
+
+    def test_auto_init_failure_stops_transcription(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.m4a"
+            output = Path(tmpdir) / "transcript.json"
+            init_script = Path(tmpdir) / "init.sh"
+            audio.write_bytes(b"fake")
+            init_script.write_text(
+                "#!/usr/bin/env bash\n"
+                "echo 'pip failed' >&2\n"
+                "exit 42\n",
+                encoding="utf-8",
+            )
+            init_script.chmod(0o755)
+            env = os.environ.copy()
+            env.pop("FASTER_WHISPER_PYTHON", None)
+            env["LISTENKIT_FASTER_WHISPER_VENV_PYTHON"] = str(Path(tmpdir) / "missing-python")
+            env["LISTENKIT_INIT_FASTER_WHISPER"] = str(init_script)
+            result = subprocess.run(
+                [
+                    str(TRANSCRIBE_SCRIPT),
+                    "--audio-path",
+                    str(audio),
+                    "--locale",
+                    "ja-JP",
+                    "--output",
+                    str(output),
+                    "--auto-init",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("pip failed", result.stderr)
+            self.assertFalse(output.exists())
 
     def test_apple_helper_can_be_used(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

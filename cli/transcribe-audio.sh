@@ -4,13 +4,14 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> [--engine faster-whisper|apple] [--output <json>]
+  cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> [--engine faster-whisper|apple] [--output <json>] [--auto-init]
 
 Options:
   --audio-path <path>      Local audio file to transcribe
   --locale <bcp47>         Speech locale, for example ja-JP or en-US
   --engine <name>          ASR backend. Defaults to faster-whisper
   --output <json>          Optional output JSON path
+  --auto-init              Allow ListenKit to create .venv and install faster-whisper when missing
   --help                   Show this help
 EOF
 }
@@ -19,6 +20,7 @@ audio_path=""
 locale=""
 engine="faster-whisper"
 output_path=""
+auto_init="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -41,6 +43,10 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || { echo "Missing value for --output" >&2; exit 1; }
       output_path="$2"
       shift 2
+      ;;
+    --auto-init)
+      auto_init="true"
+      shift
       ;;
     --help|-h)
       usage
@@ -151,22 +157,86 @@ EOF
 fi
 
 helper="${LISTENKIT_FASTER_WHISPER_HELPER:-$repo_root/tools/faster-whisper/transcribe.py}"
+repo_venv_python="${LISTENKIT_FASTER_WHISPER_VENV_PYTHON:-$repo_root/.venv/bin/python}"
+init_script="${LISTENKIT_INIT_FASTER_WHISPER:-$repo_root/cli/init-faster-whisper.sh}"
+
+python_can_import_faster_whisper() {
+  local candidate="$1"
+  [[ -x "$candidate" ]] || return 1
+  "$candidate" -c 'import faster_whisper' >/dev/null 2>&1
+}
+
+initialize_faster_whisper() {
+  if [[ ! -x "$init_script" ]]; then
+    echo "faster-whisper init script is not executable: $init_script" >&2
+    return 1
+  fi
+  "$init_script"
+}
+
 python_executable="${FASTER_WHISPER_PYTHON:-}"
 
-if [[ -z "$python_executable" ]]; then
-  cat >&2 <<EOF
-FASTER_WHISPER_PYTHON is required for the faster-whisper backend.
+if [[ -n "$python_executable" ]]; then
+  if ! python_can_import_faster_whisper "$python_executable"; then
+    echo "FASTER_WHISPER_PYTHON cannot import faster_whisper: $python_executable" >&2
+    exit 1
+  fi
+elif python_can_import_faster_whisper "$repo_venv_python"; then
+  python_executable="$repo_venv_python"
+else
+  if [[ "$auto_init" == "true" || "${LISTENKIT_AUTO_INIT:-}" == "1" ]]; then
+    python_executable="$(initialize_faster_whisper)"
+  elif [[ -t 0 ]]; then
+    printf 'ListenKit needs faster-whisper installed in %s. Install now? [y/N] ' "$repo_root/.venv" >&2
+    read -r answer
+    case "$answer" in
+      y|Y|yes|YES)
+        python_executable="$(initialize_faster_whisper)"
+        ;;
+      *)
+        cat >&2 <<EOF
+faster-whisper initialization was not approved.
 
-Create a Python environment with faster-whisper installed, then run:
-  FASTER_WHISPER_PYTHON=/path/to/venv/bin/python cli/transcribe-audio.sh --audio-path <path> --locale <bcp47>
+Run one of:
+  cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> --auto-init
+  cli/init-faster-whisper.sh
 
 Use --engine apple to force the Apple Speech backend instead.
 EOF
-  exit 1
+        exit 1
+        ;;
+    esac
+  else
+    cat >&2 <<EOF
+faster-whisper is not initialized for ListenKit.
+
+Run one of:
+  cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> --auto-init
+  LISTENKIT_AUTO_INIT=1 cli/transcribe-audio.sh --audio-path <path> --locale <bcp47>
+  cli/init-faster-whisper.sh
+
+Or set:
+  FASTER_WHISPER_PYTHON=/path/to/python
+
+Use --engine apple to force the Apple Speech backend instead.
+EOF
+    exit 1
+  fi
 fi
 
-if [[ ! -x "$python_executable" ]]; then
-  echo "FASTER_WHISPER_PYTHON is not executable: $python_executable" >&2
+if ! python_can_import_faster_whisper "$python_executable"; then
+  cat >&2 <<EOF
+faster-whisper is not importable from:
+  $python_executable
+
+Run:
+  cli/init-faster-whisper.sh
+
+Or set:
+  FASTER_WHISPER_PYTHON=/path/to/python
+
+Use --engine apple to force the Apple Speech backend instead.
+EOF
   exit 1
 fi
 

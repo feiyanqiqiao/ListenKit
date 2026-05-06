@@ -10,9 +10,18 @@ Two local ASR backends are supported:
 The default CLI boundary is:
 
 ```bash
-FASTER_WHISPER_PYTHON=/path/to/venv/bin/python \
-  cli/transcribe-audio.sh --audio-path <path> --locale <bcp47>
+cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> --auto-init
 ```
+
+The faster-whisper Python selection order is:
+
+1. `FASTER_WHISPER_PYTHON`
+2. repo-local `ListenKit/.venv/bin/python`
+3. authorized initialization through `--auto-init`, `LISTENKIT_AUTO_INIT=1`, or an interactive TTY prompt
+
+Non-interactive callers should pass `--auto-init` or run `cli/init-faster-whisper.sh` before transcription.
+
+Avoid documenting or using raw `python3 -m venv .venv` setup commands. They are working-directory dependent and can create the virtual environment outside the ListenKit repository.
 
 Fixed faster-whisper defaults:
 
@@ -48,7 +57,7 @@ If a backend fails after producing JSON, it should return an `error` object as t
 }
 ```
 
-An error payload is terminal. Renderers and adapters must not turn it into a study note; they should surface the error and ask the user to fix the backend or rerun transcription. The shell CLI checks for this leading top-level `error` shape without requiring Python on the Apple Speech path.
+An error payload is terminal. Renderers and adapters must not render it as a transcript; they should surface the error and ask the user to fix the backend or rerun transcription. The shell CLI checks for this leading top-level `error` shape without requiring Python on the Apple Speech path.
 
 ## Future Backends
 

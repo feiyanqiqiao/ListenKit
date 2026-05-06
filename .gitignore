@@ -3,6 +3,7 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.venv/
 tools/apple-speech-helper/.build/
 work/
 tmp/

@@ -15,15 +15,22 @@ The optional Apple Speech backend requires macOS with Speech APIs and Xcode comm
 The default ASR backend is `faster-whisper`:
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install faster-whisper
-export FASTER_WHISPER_PYTHON="$PWD/.venv/bin/python"
+cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP --auto-init
 ```
 
-ListenKit calls:
+`--auto-init` authorizes ListenKit to create repo-local `ListenKit/.venv`, install `faster-whisper`, and continue transcription. For a one-time manual setup, run this script from anywhere:
 
 ```bash
-cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP
+cli/init-faster-whisper.sh
+```
+
+Do not initialize with `python3 -m venv .venv` from a parent directory. That command depends on your current working directory and can create a misplaced environment such as `<vault-parent>/.venv`. The ListenKit init script derives the target directory from its own path.
+
+Advanced users can use an external Python environment:
+
+```bash
+FASTER_WHISPER_PYTHON=/path/to/python \
+  cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP
 ```
 
 Default settings:
@@ -37,8 +44,8 @@ This is the recommended starting point for an 8 GB Mac. The first run may downlo
 
 Common faster-whisper failures:
 
-- `FASTER_WHISPER_PYTHON` is not set
-- `faster-whisper` is not installed in that Python environment
+- auto-init was not authorized in a non-interactive shell
+- `faster-whisper` is not installed in the selected Python environment
 - model download is blocked or incomplete
 - the audio file is missing or unreadable
 
