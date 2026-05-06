@@ -10,7 +10,7 @@ from typing import Any
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Render a multilingual listening-study Markdown draft.")
+    parser = argparse.ArgumentParser(description="Render transcript JSON as plain Markdown.")
     parser.add_argument("--audio-path", required=True)
     parser.add_argument("--transcript-json", required=True)
     parser.add_argument("--title", required=True)
@@ -85,27 +85,6 @@ def render(args: argparse.Namespace, payload: dict[str, Any]) -> str:
             "## Transcript",
             "",
             transcript,
-            "",
-            "## Listening Focus",
-            "",
-            "- TODO: Identify fast sections, reductions, linking, speaker changes, names, numbers, or grammar that may block comprehension.",
-            "- TODO: Add language-specific focus points when useful, such as particles and conjugation for Japanese or weak forms and linking for English.",
-            "",
-            "## Useful Expressions",
-            "",
-            "_Select 0-8 transferable expressions. Leave this section empty if the transcript has no strong candidates._",
-            "",
-            "- Original: ",
-            "  Meaning: ",
-            "  Usage: ",
-            "  Pattern: ",
-            "",
-            "## Study Plan",
-            "",
-            "1. Listen once without reading and write the rough topic.",
-            "2. Read the transcript and mark unclear sounds or phrases.",
-            "3. Replay only the difficult lines and shadow them aloud.",
-            "4. Re-listen without the transcript and summarize the clip.",
             "",
         ]
     )

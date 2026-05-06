@@ -26,14 +26,11 @@ cli/render-listening-note.py \
   --output examples/sample-note-en.md
 ```
 
-## Expected Note Shape
+## Expected Markdown Shape
 
-Every note contains:
+Every rendered Markdown file contains:
 
 - `Source`
 - `Transcript`
-- `Listening Focus`
-- `Useful Expressions`
-- `Study Plan`
 
-The renderer creates a draft. An agent or human should complete the learning analysis.
+The renderer does not add learning-analysis sections. Downstream projects can build their own note templates from the transcript JSON or Markdown.

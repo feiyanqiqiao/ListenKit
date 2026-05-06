@@ -21,6 +21,6 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Speech recognition is used to transcribe local audio into listening-study notes.</string>
+	<string>Speech recognition is used to transcribe local audio.</string>
 </dict>
 </plist>

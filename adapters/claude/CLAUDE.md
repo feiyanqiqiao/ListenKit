@@ -6,10 +6,7 @@ Workflow:
 
 1. URL input: `cli/import-audio.sh --url <url> --output-dir work/audio --base-name <name>`
 2. Local or Audio Hijack input: `cli/import-audio.sh --input <path> --output-dir work/audio --base-name <name>`
-3. Transcribe: `cli/transcribe-audio.sh --audio-path <audio> --locale <bcp47> --output <json>`; add `--engine apple` only when Apple Speech is requested.
+3. Transcribe: `cli/transcribe-audio.sh --audio-path <audio> --locale <bcp47> --output <json> --auto-init`; add `--engine apple` only when Apple Speech is requested.
 4. Render: `cli/render-listening-note.py --audio-path <audio> --transcript-json <json> --title <title> --language <label> --output <md>`
-5. Edit the Markdown note by completing `Listening Focus`, `Useful Expressions`, and `Study Plan`.
 
-Keep the note plain Markdown. Do not add Obsidian-only syntax, Anki cards, or review scheduling unless explicitly requested.
-
-For Japanese, pay attention to particles, conjugation, politeness, and sound changes. For English, pay attention to weak forms, linking, reductions, phrasal verbs, and intonation. For other languages, use cautious general listening analysis.
+Keep the output to transcript JSON or plain transcript Markdown. Do not add learning-note templates, Obsidian-only syntax, Anki cards, or review scheduling unless a downstream project explicitly requests that transformation.

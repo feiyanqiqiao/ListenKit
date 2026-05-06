@@ -3,17 +3,14 @@
 When working in this repository, use the CLI scripts as the source of truth:
 
 - `cli/import-audio.sh`
-- `cli/transcribe-audio.sh` with its default faster-whisper backend
+- `cli/transcribe-audio.sh --auto-init` with its default faster-whisper backend
 - `cli/render-listening-note.py`
 
 Do not duplicate business logic inside editor rules.
 
-Expected output is plain Markdown with:
+Expected Markdown output contains:
 
 - `Source`
 - `Transcript`
-- `Listening Focus`
-- `Useful Expressions`
-- `Study Plan`
 
-Keep analysis concise and practical for listening practice. Do not add Obsidian, Anki, or spaced-repetition structures unless the user asks.
+Keep this adapter focused on transcript generation. Do not add learning-note templates, Obsidian, Anki, or review-system structures unless a downstream project asks for that transformation.

@@ -44,11 +44,15 @@ class RenderListeningNoteTests(unittest.TestCase):
             "# Sample Note",
             "## Source",
             "## Transcript",
-            "## Listening Focus",
-            "## Useful Expressions",
-            "## Study Plan",
         ]:
             self.assertIn(heading, rendered)
+        removed_headings = [
+            "## " + "Listening " + "Focus",
+            "## " + "Useful " + "Expressions",
+            "## " + "Study " + "Plan",
+        ]
+        for removed_heading in removed_headings:
+            self.assertNotIn(removed_heading, rendered)
         self.assertIn("今日は駅の近くにある小さな喫茶店", rendered)
         self.assertIn("Locale: `ja-JP`", rendered)
 
