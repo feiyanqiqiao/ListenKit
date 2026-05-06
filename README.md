@@ -2,22 +2,26 @@
 
 Local-first multilingual audio and video transcription toolchain, with optional agent adapters.
 
-This project turns foreign-language audio or video into transcript JSON and plain transcript Markdown. It is a small toolchain, not a language-learning system.
+This project turns foreign-language audio or video into plain transcript Markdown. It is a small toolchain, not a language-learning system.
 
 ## What It Does
 
 ```text
-URL or local audio
-  -> cli/import-audio.sh
-  -> cli/transcribe-audio.sh
-  -> cli/render-listening-note.py
+Recommended entrypoint:
+
+URL or local media
+  -> cli/generate-markdown.sh
   -> transcript Markdown
+
+Internal reusable stages:
+
+import-audio.sh -> transcribe-audio.sh -> render-listening-note.py
 ```
 
 Inputs:
 
 - yt-dlp-supported URLs
-- Local audio files
+- Local audio, video, or media files
 - Audio Hijack recordings saved as local files
 
 Output:
@@ -50,27 +54,14 @@ brew install yt-dlp ffmpeg
 ## Quick Example
 
 ```bash
-audio_path=$(cli/import-audio.sh \
+cli/generate-markdown.sh \
   --url "https://example.com/video" \
-  --output-dir work/audio \
-  --base-name sample \
-  --format mp3)
-
-cli/transcribe-audio.sh \
-  --audio-path "$audio_path" \
-  --locale ja-JP \
-  --output work/sample-transcript.json \
-  --auto-init
-
-cli/render-listening-note.py \
-  --audio-path "$audio_path" \
-  --transcript-json work/sample-transcript.json \
-  --title "Sample Transcript" \
   --language Japanese \
-  --output work/sample-transcript.md
+  --output work/sample-transcript.md \
+  --auto-init
 ```
 
-The default backend is `faster-whisper small` on CPU with `int8` compute. This is the recommended starting point for an 8 GB Mac. On first use, pass `--auto-init` to let ListenKit create `ListenKit/.venv` and install `faster-whisper`; advanced users can run `cli/init-faster-whisper.sh` once or set `FASTER_WHISPER_PYTHON=/path/to/python`. Do not run `python3 -m venv .venv` from a parent directory, because that creates an environment outside the ListenKit repo. To use the bundled Apple Speech helper instead, pass `--engine apple`; if your Apple Speech helper lives outside this repository, set `APPLE_SPEECH_HELPER=/path/to/helper`.
+The command derives the ASR locale from `--language` and derives the Markdown title from the source filename. The default backend is `faster-whisper small` on CPU with `int8` compute. This is the recommended starting point for an 8 GB Mac. On first use, pass `--auto-init` to let ListenKit create `ListenKit/.venv` and install `faster-whisper`; advanced users can run `cli/init-faster-whisper.sh` once or set `FASTER_WHISPER_PYTHON=/path/to/python`. Do not run `python3 -m venv .venv` from a parent directory, because that creates an environment outside the ListenKit repo. To use the bundled Apple Speech helper instead, pass `--engine apple`; if your Apple Speech helper lives outside this repository, set `APPLE_SPEECH_HELPER=/path/to/helper`.
 
 ## Adapters
 
@@ -78,7 +69,15 @@ The default backend is `faster-whisper small` on CPU with `int8` compute. This i
 - Claude: `adapters/claude/CLAUDE.md`
 - Cursor: `adapters/cursor/foreign-listening.md`
 
-All adapters call the same CLI. They should not reimplement import, transcription, rendering, or downstream note systems.
+Adapters should call the high-level `cli/generate-markdown.sh` entrypoint for normal use. They should not reimplement import, transcription, rendering, or downstream note systems.
+
+## Low-Level CLI
+
+The lower-level commands remain available for debugging, caching, and advanced workflows:
+
+- `cli/import-audio.sh`: URL or local media -> local audio file
+- `cli/transcribe-audio.sh`: local audio file -> transcript JSON
+- `cli/render-listening-note.py`: transcript JSON -> transcript Markdown
 
 `cli/import-audio.sh` can also save URL sidecars with `--write-info-json` and `--write-thumbnail`, use `--quality <value>`, and use a custom `--filename-template` when you need yt-dlp naming control.
 

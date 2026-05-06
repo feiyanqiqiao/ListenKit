@@ -11,12 +11,16 @@ from typing import Any
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render transcript JSON as plain Markdown.")
-    parser.add_argument("--audio-path", required=True)
+    parser.add_argument("--audio-path")
+    parser.add_argument("--source-ref")
     parser.add_argument("--transcript-json", required=True)
     parser.add_argument("--title", required=True)
     parser.add_argument("--language", required=True)
     parser.add_argument("--output", required=True)
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.audio_path and not args.source_ref:
+        parser.error("one of --audio-path or --source-ref is required")
+    return args
 
 
 def load_transcript(path: Path) -> dict[str, Any]:
@@ -63,8 +67,16 @@ def transcript_from_payload(payload: dict[str, Any]) -> str:
     return "\n".join(parts).strip() or "_No transcript text was generated._"
 
 
-def render(args: argparse.Namespace, payload: dict[str, Any]) -> str:
+def source_line(args: argparse.Namespace) -> str:
+    if args.source_ref:
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", args.source_ref):
+            return f"- Source: <{args.source_ref}>"
+        return f"- Source: `{args.source_ref}`"
     audio_path = Path(args.audio_path)
+    return f"- Audio: `{audio_path.name}`"
+
+
+def render(args: argparse.Namespace, payload: dict[str, Any]) -> str:
     generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     transcript = transcript_from_payload(payload)
     timing_note = "yes" if payload.get("timing_complete") else "partial or unavailable"
@@ -75,7 +87,7 @@ def render(args: argparse.Namespace, payload: dict[str, Any]) -> str:
             "",
             "## Source",
             "",
-            f"- Audio: `{audio_path.name}`",
+            source_line(args),
             f"- Language: {args.language}",
             f"- Locale: `{payload.get('locale')}`",
             f"- ASR engine: `{payload.get('engine')}`",

@@ -2,13 +2,13 @@
 
 The examples in this repository are synthetic and safe to redistribute.
 
-No sample audio files are bundled. In the render-only examples below, `--audio-path` is recorded as source metadata in the Markdown note; it does not need to exist for the renderer to run.
+No sample audio files are bundled. These examples use the lower-level render-only command against synthetic transcript JSON. The high-level `cli/generate-markdown.sh` command is for URL or local media input.
 
 ## Japanese Sample
 
 ```bash
 cli/render-listening-note.py \
-  --audio-path examples/sample-ja.m4a \
+  --source-ref examples/sample-ja.m4a \
   --transcript-json examples/sample-transcript-ja.json \
   --title "Japanese Cafe Description" \
   --language Japanese \
@@ -19,7 +19,7 @@ cli/render-listening-note.py \
 
 ```bash
 cli/render-listening-note.py \
-  --audio-path examples/sample-en.m4a \
+  --source-ref examples/sample-en.m4a \
   --transcript-json examples/sample-transcript-en.json \
   --title "English Library Description" \
   --language English \

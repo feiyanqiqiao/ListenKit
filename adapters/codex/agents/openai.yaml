@@ -1,5 +1,5 @@
 version: 1
 metadata:
   display_name: "Generate Markdown"
-  short_description: "Generate plain transcript Markdown from an existing ListenKit transcript JSON file."
-  default_prompt: "Use $generate-markdown to render an existing ListenKit transcript JSON file as plain transcript Markdown with cli/render-listening-note.py. Do not import audio, download media, run ASR transcription, or add learning-note templates, Obsidian, Anki, or review-system structures unless a downstream project explicitly asks."
+  short_description: "Generate plain transcript Markdown from a URL or local audio/video file."
+  default_prompt: "Use $generate-markdown to generate plain transcript Markdown through cli/generate-markdown.sh. Accept exactly one input source: URL or local audio/video file. Require only --language and --output in addition to the input; let the wrapper derive ASR locale and Markdown title unless the user requests an override. Do not expose existing-audio or existing-transcript-JSON workflows through this high-level skill, and do not add learning-note templates, Obsidian, Anki, or review-system structures unless a downstream project explicitly asks."

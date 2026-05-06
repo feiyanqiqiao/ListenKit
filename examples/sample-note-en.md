@@ -2,7 +2,7 @@
 
 ## Source
 
-- Audio: `sample-en.m4a`
+- Source: `examples/sample-en.m4a`
 - Language: English
 - Locale: `en-US`
 - ASR engine: `faster-whisper`

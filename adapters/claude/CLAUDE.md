@@ -2,11 +2,18 @@
 
 Use the repository CLI. Do not reimplement the pipeline in prompt text.
 
-Workflow:
+Normal workflow:
 
-1. URL input: `cli/import-audio.sh --url <url> --output-dir work/audio --base-name <name>`
-2. Local or Audio Hijack input: `cli/import-audio.sh --input <path> --output-dir work/audio --base-name <name>`
-3. Transcribe: `cli/transcribe-audio.sh --audio-path <audio> --locale <bcp47> --output <json> --auto-init`; add `--engine apple` only when Apple Speech is requested.
-4. Render: `cli/render-listening-note.py --audio-path <audio> --transcript-json <json> --title <title> --language <label> --output <md>`
+```bash
+cli/generate-markdown.sh \
+  --url <url> \
+  --language <label> \
+  --output <md> \
+  --auto-init
+```
+
+The high-level command also accepts `--input <path>` as the single input source. It derives the ASR locale from `--language` and derives the Markdown title from the source filename unless optional overrides are provided.
+
+Use the lower-level `cli/import-audio.sh`, `cli/transcribe-audio.sh`, and `cli/render-listening-note.py` commands only for debugging, caching, or advanced workflows.
 
 Keep the output to transcript JSON or plain transcript Markdown. Do not add learning-note templates, Obsidian-only syntax, Anki cards, or review scheduling unless a downstream project explicitly requests that transformation.

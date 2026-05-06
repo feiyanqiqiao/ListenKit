@@ -1,28 +1,46 @@
 ---
 name: generate-markdown
-description: Generate plain transcript Markdown from an existing ListenKit transcript JSON file.
+description: Generate plain transcript Markdown from a URL or local audio/video file.
 ---
 
 # Generate Markdown
 
-Use this skill when the user already has a ListenKit transcript JSON file and wants to render it as plain transcript Markdown.
+Use this skill when the user wants ListenKit to produce plain transcript Markdown from one input: a network audio/video URL or a local audio/video file.
 
 ## Workflow
 
-1. Confirm the input transcript JSON path.
-2. Choose the source audio path, title, language label, and output Markdown path.
-3. Render transcript Markdown with `cli/render-listening-note.py`.
+1. Confirm exactly one input source: URL or local media path.
+2. Choose the output Markdown path and user-facing language label.
+3. Run `cli/generate-markdown.sh` once with the matching input option.
+
+The wrapper derives the ASR locale from `--language` and derives the Markdown title from the source filename. Use optional `--locale` or `--title` only when the user needs an override.
 
 ## Rules
 
 - Keep output as plain Markdown.
-- Do not import audio, download media, or run ASR transcription from this skill.
+- Do not expose existing-audio or existing-transcript-JSON workflows through this high-level skill; those belong to lower-level CLI debugging or caching workflows.
 - Do not add learning-note templates, Obsidian frontmatter, wikilinks, Anki cards, or review scheduling unless a downstream project explicitly asks.
 - Keep language-learning analysis outside this generic transcription skill.
 - Respect copyright. Do not help redistribute copyrighted transcripts or audio.
 
 ## CLI Examples
 
+URL input:
+
 ```bash
-cli/render-listening-note.py --audio-path work/audio/clip.mp3 --transcript-json work/clip.json --title "Clip" --language Japanese --output work/clip.md
+cli/generate-markdown.sh \
+  --url "https://example.com/video" \
+  --language Japanese \
+  --output work/sample-transcript.md \
+  --auto-init
+```
+
+Local media input:
+
+```bash
+cli/generate-markdown.sh \
+  --input ~/Desktop/recording.wav \
+  --language English \
+  --output work/recording-transcript.md \
+  --auto-init
 ```

@@ -2,7 +2,7 @@
 
 ## Source
 
-- Audio: `sample-ja.m4a`
+- Source: `examples/sample-ja.m4a`
 - Language: Japanese
 - Locale: `ja-JP`
 - ASR engine: `faster-whisper`
