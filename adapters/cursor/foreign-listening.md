@@ -3,6 +3,7 @@
 When working in this repository, use the CLI scripts as the source of truth:
 
 - `cli/generate-markdown.sh` for normal URL or local audio/video -> Markdown workflows
+- URL workflows try platform subtitles first while still importing local listening audio
 - `cli/import-audio.sh`, `cli/transcribe-audio.sh`, and `cli/render-listening-note.py` only for debugging, caching, or advanced workflows
 
 Do not duplicate business logic inside editor rules.

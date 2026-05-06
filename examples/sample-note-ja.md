@@ -5,7 +5,7 @@
 - Source: `examples/sample-ja.m4a`
 - Language: Japanese
 - Locale: `ja-JP`
-- ASR engine: `faster-whisper`
+- Transcript engine: `faster-whisper`
 - Timing complete: yes
 - Generated at: 2026-05-02T00:38:10+00:00
 

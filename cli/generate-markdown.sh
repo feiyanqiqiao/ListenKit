@@ -209,6 +209,7 @@ fi
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 import_script="$repo_root/cli/import-audio.sh"
+subtitle_script="$repo_root/cli/extract-subtitles.sh"
 transcribe_script="$repo_root/cli/transcribe-audio.sh"
 render_script="$repo_root/cli/render-listening-note.py"
 
@@ -220,6 +221,15 @@ output_stem="${output_file%.*}"
 
 transcript_json="${output_dir%/}/${output_stem}.json"
 source_ref="${url:-$input_path}"
+subtitle_available="false"
+
+if [[ -n "$url" ]]; then
+  subtitle_error_log="$(mktemp)"
+  if "$subtitle_script" --url "$url" --locale "$locale" --output "$transcript_json" >/dev/null 2>"$subtitle_error_log"; then
+    subtitle_available="true"
+  fi
+  rm -f "$subtitle_error_log"
+fi
 
 import_command=(
   "$import_script"
@@ -245,6 +255,29 @@ fi
 
 if ! audio_path="$("${import_command[@]}")"; then
   if [[ -n "$url" ]]; then
+    if [[ "$subtitle_available" == "true" ]]; then
+      cat >&2 <<EOF
+
+Audio import failed after subtitles were extracted.
+Markdown was generated from subtitles, but no local listening audio was created.
+
+To create listening audio, record the source with Audio Hijack or another local recorder, then rerun with:
+  cli/generate-markdown.sh --input <recording> --language "$language" --output "$output_path"
+
+See docs/audio-hijack.md.
+EOF
+      if [[ -z "$title" ]]; then
+        title="$output_stem"
+      fi
+      "$render_script" \
+        --source-ref "$source_ref" \
+        --transcript-json "$transcript_json" \
+        --title "$title" \
+        --language "$language" \
+        --output "$output_path"
+      exit 0
+    fi
+
     cat >&2 <<EOF
 
 Audio import failed. See the error above from cli/import-audio.sh.
@@ -272,17 +305,19 @@ if [[ -z "$title" ]]; then
   fi
 fi
 
-transcribe_command=(
-  "$transcribe_script"
-  --audio-path "$audio_path"
-  --locale "$locale"
-  --engine "$engine"
-  --output "$transcript_json"
-)
-if [[ "$auto_init" == "true" ]]; then
-  transcribe_command+=(--auto-init)
+if [[ "$subtitle_available" != "true" ]]; then
+  transcribe_command=(
+    "$transcribe_script"
+    --audio-path "$audio_path"
+    --locale "$locale"
+    --engine "$engine"
+    --output "$transcript_json"
+  )
+  if [[ "$auto_init" == "true" ]]; then
+    transcribe_command+=(--auto-init)
+  fi
+  "${transcribe_command[@]}" >/dev/null
 fi
-"${transcribe_command[@]}" >/dev/null
 
 "$render_script" \
   --source-ref "$source_ref" \

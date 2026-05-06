@@ -15,6 +15,8 @@ Use this skill when the user wants ListenKit to produce plain transcript Markdow
 
 The wrapper derives the ASR locale from `--language` and derives the Markdown title from the source filename. Use optional `--locale` or `--title` only when the user needs an override.
 
+For URL input, the wrapper tries platform subtitles first. If subtitles are usable, it renders the transcript from subtitles and skips ASR, while still trying to import local audio for listening. If subtitles are unavailable, it falls back to imported audio plus ASR.
+
 ## Rules
 
 - Keep output as plain Markdown.

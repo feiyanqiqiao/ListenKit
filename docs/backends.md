@@ -2,10 +2,11 @@
 
 ## v1
 
-Two local ASR backends are supported:
+Two local ASR backends and one URL subtitle backend are supported:
 
 - `faster-whisper` is the default
 - `apple` is optional and uses the bundled Apple Speech helper by default
+- `yt-dlp-subtitles` is used by the high-level URL workflow when platform subtitles are available
 
 The default CLI boundary is:
 
@@ -46,6 +47,8 @@ Any helper must return:
 - `segments`
 - `timing_complete`
 
+The subtitle backend uses the same transcript JSON shape. It is only used for URL input by `cli/generate-markdown.sh`; `cli/transcribe-audio.sh` remains a local audio ASR command.
+
 If a backend fails after producing JSON, it should return an `error` object as the first top-level field:
 
 ```json
@@ -64,6 +67,5 @@ An error payload is terminal. Renderers and adapters must not render it as a tra
 Potential future engines:
 
 - cloud ASR APIs
-- subtitle extraction when a source already has captions
 
 Any future backend should preserve the same transcript JSON shape so adapters and renderers do not fork.

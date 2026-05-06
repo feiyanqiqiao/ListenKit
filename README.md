@@ -63,6 +63,8 @@ cli/generate-markdown.sh \
 
 The command derives the ASR locale from `--language` and derives the Markdown title from the source filename. The default backend is `faster-whisper small` on CPU with `int8` compute. This is the recommended starting point for an 8 GB Mac. On first use, pass `--auto-init` to let ListenKit create `ListenKit/.venv` and install `faster-whisper`; advanced users can run `cli/init-faster-whisper.sh` once or set `FASTER_WHISPER_PYTHON=/path/to/python`. Do not run `python3 -m venv .venv` from a parent directory, because that creates an environment outside the ListenKit repo. To use the bundled Apple Speech helper instead, pass `--engine apple`; if your Apple Speech helper lives outside this repository, set `APPLE_SPEECH_HELPER=/path/to/helper`.
 
+For URL input, ListenKit first tries platform subtitles through `yt-dlp`. If usable subtitles are found, they become the transcript source and ASR is skipped, but ListenKit still attempts to import local audio for listening practice. If subtitles are unavailable, the command falls back to audio import plus ASR.
+
 ## Adapters
 
 - Codex: `adapters/codex/SKILL.md`
@@ -76,6 +78,7 @@ Adapters should call the high-level `cli/generate-markdown.sh` entrypoint for no
 The lower-level commands remain available for debugging, caching, and advanced workflows:
 
 - `cli/import-audio.sh`: URL or local media -> local audio file
+- `cli/extract-subtitles.sh`: URL subtitles -> transcript JSON
 - `cli/transcribe-audio.sh`: local audio file -> transcript JSON
 - `cli/render-listening-note.py`: transcript JSON -> transcript Markdown
 

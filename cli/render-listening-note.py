@@ -90,7 +90,7 @@ def render(args: argparse.Namespace, payload: dict[str, Any]) -> str:
             source_line(args),
             f"- Language: {args.language}",
             f"- Locale: `{payload.get('locale')}`",
-            f"- ASR engine: `{payload.get('engine')}`",
+            f"- Transcript engine: `{payload.get('engine')}`",
             f"- Timing complete: {timing_note}",
             f"- Generated at: {generated_at}",
             "",

@@ -60,6 +60,76 @@ class GenerateMarkdownTests(unittest.TestCase):
         env["YTDLP_LOG"] = str(tmpdir / "yt-dlp.log")
         env["YTDLP_OUTPUT"] = str(imported)
 
+    def add_fake_url_tools_with_subtitles(self, tmpdir: Path, env: dict[str, str], imported: Path) -> None:
+        bin_dir = tmpdir / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        (bin_dir / "ffmpeg").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+        (bin_dir / "yt-dlp").write_text(
+            """#!/usr/bin/env bash
+mode="audio"
+paths=""
+prev=""
+for arg in "$@"; do
+  if [[ "$arg" == "--skip-download" ]]; then mode="subtitles"; fi
+  if [[ "$prev" == "--paths" ]]; then paths="$arg"; fi
+  prev="$arg"
+done
+if [[ "$mode" == "subtitles" ]]; then
+  mkdir -p "$paths"
+  cat > "$paths/subtitle.ja.vtt" <<'VTT'
+WEBVTT
+
+00:00:01.000 --> 00:00:02.000
+字幕テキスト
+VTT
+  exit 0
+fi
+printf '%s\n' "$@" > "$YTDLP_LOG"
+mkdir -p "$(dirname "$YTDLP_OUTPUT")"
+touch "$YTDLP_OUTPUT"
+printf '%s\n' "$YTDLP_OUTPUT"
+""",
+            encoding="utf-8",
+        )
+        os.chmod(bin_dir / "ffmpeg", 0o755)
+        os.chmod(bin_dir / "yt-dlp", 0o755)
+        env["PATH"] = f"{bin_dir}:{env['PATH']}"
+        env["YTDLP_LOG"] = str(tmpdir / "yt-dlp.log")
+        env["YTDLP_OUTPUT"] = str(imported)
+
+    def add_fake_url_tools_with_subtitles_and_audio_failure(self, tmpdir: Path, env: dict[str, str]) -> None:
+        bin_dir = tmpdir / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        (bin_dir / "ffmpeg").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+        (bin_dir / "yt-dlp").write_text(
+            """#!/usr/bin/env bash
+mode="audio"
+paths=""
+prev=""
+for arg in "$@"; do
+  if [[ "$arg" == "--skip-download" ]]; then mode="subtitles"; fi
+  if [[ "$prev" == "--paths" ]]; then paths="$arg"; fi
+  prev="$arg"
+done
+if [[ "$mode" == "subtitles" ]]; then
+  mkdir -p "$paths"
+  cat > "$paths/subtitle.ja.vtt" <<'VTT'
+WEBVTT
+
+00:00:01.000 --> 00:00:02.000
+字幕だけ成功
+VTT
+  exit 0
+fi
+echo 'mock audio import failure' >&2
+exit 42
+""",
+            encoding="utf-8",
+        )
+        os.chmod(bin_dir / "ffmpeg", 0o755)
+        os.chmod(bin_dir / "yt-dlp", 0o755)
+        env["PATH"] = f"{bin_dir}:{env['PATH']}"
+
     def add_fake_ffmpeg(self, tmpdir: Path, env: dict[str, str]) -> None:
         bin_dir = tmpdir / "bin"
         bin_dir.mkdir(exist_ok=True)
@@ -126,6 +196,68 @@ class GenerateMarkdownTests(unittest.TestCase):
             self.assertIn("Locale: `ja-JP`", rendered)
             self.assertIn("generated transcript", rendered)
             self.assertTrue((tmpdir / "out" / "sample.json").exists())
+
+    def test_url_subtitles_skip_asr_but_still_import_audio(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            output = tmpdir / "out" / "sample.md"
+            imported = tmpdir / "out" / "audio" / "sample.m4a"
+            env = self.base_env(tmpdir)
+            self.add_fake_url_tools_with_subtitles(tmpdir, env, imported)
+
+            result = subprocess.run(
+                [
+                    str(GENERATE_SCRIPT),
+                    "--url",
+                    "https://example.com/video",
+                    "--language",
+                    "Japanese",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rendered = output.read_text(encoding="utf-8")
+            self.assertIn("字幕テキスト", rendered)
+            self.assertNotIn("generated transcript", rendered)
+            self.assertTrue(imported.exists())
+            self.assertFalse((tmpdir / "transcribe.log").exists())
+
+    def test_url_subtitles_allow_markdown_when_audio_import_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            output = tmpdir / "out" / "sample.md"
+            env = self.base_env(tmpdir)
+            self.add_fake_url_tools_with_subtitles_and_audio_failure(tmpdir, env)
+
+            result = subprocess.run(
+                [
+                    str(GENERATE_SCRIPT),
+                    "--url",
+                    "https://example.com/video",
+                    "--language",
+                    "Japanese",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("mock audio import failure", result.stderr)
+            self.assertIn("Audio import failed after subtitles were extracted", result.stderr)
+            self.assertIn("no local listening audio was created", result.stderr)
+            self.assertIn("Audio Hijack", result.stderr)
+            self.assertIn("字幕だけ成功", output.read_text(encoding="utf-8"))
+            self.assertFalse((tmpdir / "transcribe.log").exists())
 
     def test_local_input_derives_title_from_input_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

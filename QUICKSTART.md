@@ -12,7 +12,7 @@ cli/generate-markdown.sh \
   --auto-init
 ```
 
-This single command imports audio, derives `ja-JP` from `Japanese`, transcribes the audio to transcript JSON, and renders plain transcript Markdown. It defaults to single-item URL import through `yt-dlp --no-playlist`.
+This single command derives `ja-JP` from `Japanese`, tries URL subtitles first, imports local audio for listening, and renders plain transcript Markdown. If no usable subtitles are available, it falls back to ASR from the imported audio. URL import defaults to single-item mode through `yt-dlp --no-playlist`.
 
 ## Local Media Input
 
@@ -49,6 +49,7 @@ The default backend is `faster-whisper small` with CPU `int8`, which is the reco
 The high-level command is the recommended interface for URL or local media input. The lower-level commands remain available for debugging, caching, and advanced workflows:
 
 - `cli/import-audio.sh`
+- `cli/extract-subtitles.sh`
 - `cli/transcribe-audio.sh`
 - `cli/render-listening-note.py`
 
