@@ -2,20 +2,16 @@
 
 Local-first multilingual audio and video transcription toolchain, with optional agent adapters.
 
-This project turns foreign-language audio or video into plain transcript Markdown. It is a small toolchain, not a language-learning system.
+This project turns foreign-language audio or video into normalized transcript artifacts. It is a small toolchain, not a language-learning system.
 
 ## What It Does
 
 ```text
-Recommended entrypoint:
+Public entrypoint:
 
 URL or local media
   -> cli/generate-markdown.sh
-  -> transcript Markdown
-
-Internal reusable stages:
-
-import-audio.sh -> transcribe-audio.sh -> render-listening-note.py
+  -> transcript Markdown + same-stem transcript JSON
 ```
 
 Inputs:
@@ -26,8 +22,8 @@ Inputs:
 
 Output:
 
-- Transcript JSON
 - Plain Markdown with source metadata and transcript text
+- Same-stem transcript JSON with normalized text, segments, engine metadata, locale, and timing status
 
 ## What It Is Not
 
@@ -63,7 +59,7 @@ cli/generate-markdown.sh \
 
 The command derives the ASR locale from `--language` and derives the Markdown title from the source filename. The default backend is `faster-whisper small` on CPU with `int8` compute. This is the recommended starting point for an 8 GB Mac. On first use, pass `--auto-init` to let ListenKit create `ListenKit/.venv` and install `faster-whisper`; advanced users can run `cli/init-faster-whisper.sh` once or set `FASTER_WHISPER_PYTHON=/path/to/python`. Do not run `python3 -m venv .venv` from a parent directory, because that creates an environment outside the ListenKit repo. To use the bundled Apple Speech helper instead, pass `--engine apple`; if your Apple Speech helper lives outside this repository, set `APPLE_SPEECH_HELPER=/path/to/helper`.
 
-For URL input, ListenKit first tries platform subtitles through `yt-dlp`. If usable subtitles are found, they become the transcript source and ASR is skipped, but ListenKit still attempts to import local audio for listening practice. If subtitles are unavailable, the command falls back to audio import plus ASR.
+This writes `work/sample-transcript.md` and `work/sample-transcript.json`. For URL input, ListenKit first tries platform subtitles through its wrapper. If usable subtitles are found, they become the transcript source and ASR is skipped, but ListenKit still attempts to import local audio. If subtitles are unavailable, the command falls back to audio import plus ASR.
 
 ## Adapters
 
@@ -71,18 +67,13 @@ For URL input, ListenKit first tries platform subtitles through `yt-dlp`. If usa
 - Claude: `adapters/claude/CLAUDE.md`
 - Cursor: `adapters/cursor/foreign-listening.md`
 
-Adapters should call the high-level `cli/generate-markdown.sh` entrypoint for normal use. They should not reimplement import, transcription, rendering, or downstream note systems.
+Adapters should call the public `cli/generate-markdown.sh` entrypoint for normal use, then consume either the generated Markdown or same-stem JSON. They should not reimplement import, subtitle extraction, transcription, rendering, or downstream note systems.
 
-## Low-Level CLI
+## For Agents And Integrators
 
-The lower-level commands remain available for debugging, caching, and advanced workflows:
+External LLM agents should follow `LLM_INTEGRATION.md`. In normal integrations, `cli/generate-markdown.sh` is the only public entrypoint.
 
-- `cli/import-audio.sh`: URL or local media -> local audio file
-- `cli/extract-subtitles.sh`: URL subtitles -> transcript JSON
-- `cli/transcribe-audio.sh`: local audio file -> transcript JSON
-- `cli/render-listening-note.py`: transcript JSON -> transcript Markdown
-
-`cli/import-audio.sh` can also save URL sidecars with `--write-info-json` and `--write-thumbnail`, use `--quality <value>`, and use a custom `--filename-template` when you need yt-dlp naming control.
+Lower-level commands and backend helpers are maintenance/debugging interfaces, documented in `docs/debugging.md`.
 
 ## Privacy and Copyright
 

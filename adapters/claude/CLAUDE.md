@@ -14,8 +14,10 @@ cli/generate-markdown.sh \
 
 The high-level command also accepts `--input <path>` as the single input source. It derives the ASR locale from `--language` and derives the Markdown title from the source filename unless optional overrides are provided.
 
+For `--output path/name.md`, consume `path/name.md` as the readable transcript and `path/name.json` as the structured transcript artifact.
+
 For URL input, the high-level command tries platform subtitles first and still attempts to import local audio. If subtitles are unavailable, it falls back to imported audio plus ASR.
 
-Use the lower-level `cli/import-audio.sh`, `cli/transcribe-audio.sh`, and `cli/render-listening-note.py` commands only for debugging, caching, or advanced workflows.
+Do not call lower-level import, subtitle extraction, ASR, rendering, raw downloader, or `tools/*` workflows in normal integrations. They are ListenKit debugging and maintenance interfaces only.
 
 Keep the output to transcript JSON or plain transcript Markdown. Do not add learning-note templates, Obsidian-only syntax, Anki cards, or review scheduling unless a downstream project explicitly requests that transformation.

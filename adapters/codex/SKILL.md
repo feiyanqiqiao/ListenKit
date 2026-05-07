@@ -1,11 +1,11 @@
 ---
 name: generate-markdown
-description: Generate plain transcript Markdown from a URL or local audio/video file.
+description: Generate transcript Markdown and same-stem transcript JSON from a URL or local audio/video file.
 ---
 
 # Generate Markdown
 
-Use this skill when the user wants ListenKit to produce plain transcript Markdown from one input: a network audio/video URL or a local audio/video file.
+Use this skill when the user wants ListenKit to produce transcript artifacts from one input: a network audio/video URL or a local audio/video file.
 
 ## Workflow
 
@@ -15,12 +15,14 @@ Use this skill when the user wants ListenKit to produce plain transcript Markdow
 
 The wrapper derives the ASR locale from `--language` and derives the Markdown title from the source filename. Use optional `--locale` or `--title` only when the user needs an override.
 
+For `--output work/name.md`, the wrapper writes both `work/name.md` and `work/name.json`. Use the Markdown for readable transcript output and the JSON for downstream structured transformations.
+
 For URL input, the wrapper tries platform subtitles first. If subtitles are usable, it renders the transcript from subtitles and skips ASR, while still trying to import local audio for listening. If subtitles are unavailable, it falls back to imported audio plus ASR.
 
 ## Rules
 
-- Keep output as plain Markdown.
-- Do not expose existing-audio or existing-transcript-JSON workflows through this high-level skill; those belong to lower-level CLI debugging or caching workflows.
+- Keep ListenKit output to transcript Markdown and the same-stem transcript JSON artifact.
+- Do not expose existing-audio, existing-transcript-JSON, subtitle extraction, ASR, import, rendering, raw downloader, or `tools/*` workflows through this high-level skill; those belong to ListenKit debugging and maintenance only.
 - Do not add learning-note templates, Obsidian frontmatter, wikilinks, Anki cards, or review scheduling unless a downstream project explicitly asks.
 - Keep language-learning analysis outside this generic transcription skill.
 - Respect copyright. Do not help redistribute copyrighted transcripts or audio.

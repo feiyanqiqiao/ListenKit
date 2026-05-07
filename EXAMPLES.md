@@ -1,8 +1,8 @@
-# Examples
+# Renderer Fixture Examples
 
 The examples in this repository are synthetic and safe to redistribute.
 
-No sample audio files are bundled. These examples use the lower-level render-only command against synthetic transcript JSON. The high-level `cli/generate-markdown.sh` command is for URL or local media input.
+No sample audio files are bundled. These examples are renderer fixtures for maintainers and use synthetic transcript JSON. They are not the external integration path. External integrations should use `cli/generate-markdown.sh`; see `LLM_INTEGRATION.md`.
 
 ## Japanese Sample
 

@@ -7,15 +7,16 @@ Recommended workflow:
 1. Create a session that records the target app or system audio.
 2. Save the recording as WAV, AIFF, M4A, or MP3.
 3. Stop recording after the clip ends.
-4. Import the local file:
+4. Generate transcript artifacts from the local file:
 
 ```bash
-cli/import-audio.sh \
+cli/generate-markdown.sh \
   --input ~/Music/AudioHijack/session-recording.wav \
-  --output-dir work/audio \
-  --base-name my-recording \
-  --format m4a
+  --language Japanese \
+  --output work/my-recording.md \
+  --auto-init
 ```
 
-This project does not automate or configure Audio Hijack in v1.
+This writes both `work/my-recording.md` and `work/my-recording.json`.
 
+This project does not automate or configure Audio Hijack in v1.

@@ -1,5 +1,9 @@
 # Backends
 
+This is a maintenance reference for ListenKit internals. External LLM agents
+should follow `LLM_INTEGRATION.md` and call `cli/generate-markdown.sh` instead
+of calling backend commands directly.
+
 ## v1
 
 Two local ASR backends and one URL subtitle backend are supported:

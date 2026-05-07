@@ -12,7 +12,9 @@ cli/generate-markdown.sh \
   --auto-init
 ```
 
-This single command derives `ja-JP` from `Japanese`, tries URL subtitles first, imports local audio for listening, and renders plain transcript Markdown. If no usable subtitles are available, it falls back to ASR from the imported audio. URL import defaults to single-item mode through `yt-dlp --no-playlist`.
+This single command derives `ja-JP` from `Japanese`, tries URL subtitles first, imports local audio for listening, and renders plain transcript Markdown. If no usable subtitles are available, it falls back to ASR from the imported audio. URL import defaults to single-item mode.
+
+It writes both `work/lesson-one.md` and the structured transcript artifact `work/lesson-one.json`.
 
 ## Local Media Input
 
@@ -25,6 +27,8 @@ cli/generate-markdown.sh \
 ```
 
 Use this path for Audio Hijack recordings or any existing local audio/video file. The Markdown title is derived from the input filename unless `--title` is provided.
+
+This writes both `work/recording-transcript.md` and `work/recording-transcript.json`.
 
 ## Optional Overrides
 
@@ -44,14 +48,11 @@ Use `--locale` for regional ASR variants and `--title` when the generated title 
 
 The default backend is `faster-whisper small` with CPU `int8`, which is the recommended local option for an 8 GB Mac. `--auto-init` authorizes ListenKit to create `ListenKit/.venv` and install `faster-whisper` on first use. Do not manually run `python3 -m venv .venv` from a parent directory; use `--auto-init` or `cli/init-faster-whisper.sh` so the environment stays inside this repo. Use `--engine apple` if you want the bundled Apple Speech backend. See `INSTALL.md`.
 
-## Low-Level CLI
+## Agent Integrations
 
-The high-level command is the recommended interface for URL or local media input. The lower-level commands remain available for debugging, caching, and advanced workflows:
+External agents should use `cli/generate-markdown.sh` as the only public ListenKit entrypoint, then consume either the generated Markdown or same-stem JSON artifact.
 
-- `cli/import-audio.sh`
-- `cli/extract-subtitles.sh`
-- `cli/transcribe-audio.sh`
-- `cli/render-listening-note.py`
+See `LLM_INTEGRATION.md` for the integration contract. Lower-level commands are maintenance/debugging interfaces; see `docs/debugging.md`.
 
 ## Agent Adapters
 
