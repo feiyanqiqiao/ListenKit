@@ -26,7 +26,7 @@ cli/generate-markdown.sh \
   --auto-init
 ```
 
-Use this path for Audio Hijack recordings or any existing local audio/video file. The Markdown title is derived from the input filename unless `--title` is provided.
+Use this path for Audio Hijack recordings or any existing local audio/video file. For URL input, the Markdown title defaults to the video's platform title when available. For local input, the Markdown title is derived from the input filename unless `--title` is provided.
 
 This writes both `work/recording-transcript.md` and `work/recording-transcript.json`.
 
@@ -42,7 +42,7 @@ cli/generate-markdown.sh \
   --auto-init
 ```
 
-Use `--locale` for regional ASR variants and `--title` when the generated title should not come from the source filename.
+Use `--locale` for regional ASR variants and `--title` when the generated title should not use the URL platform title or local source filename.
 
 ## Backends
 

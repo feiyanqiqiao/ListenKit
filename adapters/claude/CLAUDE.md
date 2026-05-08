@@ -12,7 +12,7 @@ cli/generate-markdown.sh \
   --auto-init
 ```
 
-The high-level command also accepts `--input <path>` as the single input source. It derives the ASR locale from `--language` and derives the Markdown title from the source filename unless optional overrides are provided.
+The high-level command also accepts `--input <path>` as the single input source. It derives the ASR locale from `--language`. URL titles default to the video's platform title when available; local titles default to the source filename unless optional overrides are provided.
 
 For `--output path/name.md`, consume `path/name.md` as the readable transcript and `path/name.json` as the structured transcript artifact.
 

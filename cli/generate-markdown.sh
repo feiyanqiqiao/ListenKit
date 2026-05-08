@@ -13,7 +13,7 @@ Core:
   --output <md>                  Output Markdown path
 
 Optional overrides:
-  --title <title>                Optional Markdown title override. Defaults to the source filename stem
+  --title <title>                Optional Markdown title override. URL defaults to platform title when available; local input defaults to source filename
   --locale <bcp47>               Optional ASR locale override. Defaults from --language
 
 ASR options:
@@ -85,6 +85,31 @@ stem_from_path() {
     return 1
   fi
   printf '%s\n' "$stem"
+}
+
+title_from_url() {
+  local value="$1"
+  command -v yt-dlp >/dev/null 2>&1 || return 1
+
+  local title_file
+  title_file="$(mktemp)"
+  if yt-dlp \
+    --quiet \
+    --no-warnings \
+    --skip-download \
+    --no-playlist \
+    --print title \
+    "$value" >"$title_file" 2>/dev/null; then
+    local first_line
+    IFS= read -r first_line <"$title_file" || first_line=""
+    rm -f "$title_file"
+    if [[ -n "$first_line" ]]; then
+      printf '%s\n' "$first_line"
+      return 0
+    fi
+  fi
+  rm -f "$title_file"
+  return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -222,6 +247,11 @@ output_stem="${output_file%.*}"
 transcript_json="${output_dir%/}/${output_stem}.json"
 source_ref="${url:-$input_path}"
 subtitle_available="false"
+url_title=""
+
+if [[ -n "$url" && -z "$title" ]]; then
+  url_title="$(title_from_url "$url" || true)"
+fi
 
 if [[ -n "$url" ]]; then
   subtitle_error_log="$(mktemp)"
@@ -267,7 +297,7 @@ To create listening audio, record the source with Audio Hijack or another local 
 See docs/audio-hijack.md.
 EOF
       if [[ -z "$title" ]]; then
-        title="$output_stem"
+        title="${url_title:-$output_stem}"
       fi
       "$render_script" \
         --source-ref "$source_ref" \
@@ -296,7 +326,9 @@ if [[ "$audio_path" == *$'\n'* ]]; then
 fi
 
 if [[ -z "$title" ]]; then
-  if [[ -n "$input_path" ]] && title="$(stem_from_path "$input_path")"; then
+  if [[ -n "$url_title" ]]; then
+    title="$url_title"
+  elif [[ -n "$input_path" ]] && title="$(stem_from_path "$input_path")"; then
     :
   elif title="$(stem_from_path "$audio_path")"; then
     :

@@ -21,6 +21,10 @@ ListenKit owns source acquisition, subtitle selection, ASR fallback, transcript
 normalization, and plain transcript rendering behind this entrypoint. External
 agents should not reimplement or bypass those stages.
 
+For URL input, the Markdown title defaults to the video's platform title when
+available. For local input, the title defaults to the source filename. Use
+`--title` only when the caller needs an explicit override.
+
 ## Output Contract
 
 For an output path like:
@@ -74,4 +78,3 @@ or transcript JSON normalization behavior.
 
 Use direct low-level calls only when debugging ListenKit itself or maintaining
 the pipeline. See `docs/debugging.md`.
-

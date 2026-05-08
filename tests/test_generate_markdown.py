@@ -48,6 +48,14 @@ class GenerateMarkdownTests(unittest.TestCase):
         (bin_dir / "ffmpeg").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
         (bin_dir / "yt-dlp").write_text(
             "#!/usr/bin/env bash\n"
+            "prev=\"\"\n"
+            "for arg in \"$@\"; do\n"
+            "  if [[ \"$prev\" == \"--print\" && \"$arg\" == \"title\" ]]; then\n"
+            "    printf 'Original Video Title\\n'\n"
+            "    exit 0\n"
+            "  fi\n"
+            "  prev=\"$arg\"\n"
+            "done\n"
             "printf '%s\\n' \"$@\" > \"$YTDLP_LOG\"\n"
             "mkdir -p \"$(dirname \"$YTDLP_OUTPUT\")\"\n"
             "touch \"$YTDLP_OUTPUT\"\n"
@@ -70,6 +78,10 @@ mode="audio"
 paths=""
 prev=""
 for arg in "$@"; do
+  if [[ "$prev" == "--print" && "$arg" == "title" ]]; then
+    printf 'Original Video Title\n'
+    exit 0
+  fi
   if [[ "$arg" == "--skip-download" ]]; then mode="subtitles"; fi
   if [[ "$prev" == "--paths" ]]; then paths="$arg"; fi
   prev="$arg"
@@ -107,6 +119,10 @@ mode="audio"
 paths=""
 prev=""
 for arg in "$@"; do
+  if [[ "$prev" == "--print" && "$arg" == "title" ]]; then
+    printf 'Original Video Title\n'
+    exit 0
+  fi
   if [[ "$arg" == "--skip-download" ]]; then mode="subtitles"; fi
   if [[ "$prev" == "--paths" ]]; then paths="$arg"; fi
   prev="$arg"
@@ -191,11 +207,42 @@ exit 42
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.strip(), str(output))
             rendered = output.read_text(encoding="utf-8")
-            self.assertIn("# sample", rendered)
+            self.assertIn("# Original Video Title", rendered)
             self.assertIn("- Source: <https://example.com/video>", rendered)
             self.assertIn("Locale: `ja-JP`", rendered)
             self.assertIn("generated transcript", rendered)
             self.assertTrue((tmpdir / "out" / "sample.json").exists())
+
+    def test_url_title_override_wins_over_video_title(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            output = tmpdir / "out" / "sample.md"
+            imported = tmpdir / "out" / "audio" / "sample.m4a"
+            env = self.base_env(tmpdir)
+            self.add_fake_url_tools(tmpdir, env, imported)
+
+            result = subprocess.run(
+                [
+                    str(GENERATE_SCRIPT),
+                    "--url",
+                    "https://example.com/video",
+                    "--language",
+                    "Japanese",
+                    "--title",
+                    "Manual URL Title",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rendered = output.read_text(encoding="utf-8")
+            self.assertIn("# Manual URL Title", rendered)
+            self.assertNotIn("# Original Video Title", rendered)
 
     def test_url_subtitles_skip_asr_but_still_import_audio(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -223,6 +270,7 @@ exit 42
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             rendered = output.read_text(encoding="utf-8")
+            self.assertIn("# Original Video Title", rendered)
             self.assertIn("字幕テキスト", rendered)
             self.assertNotIn("generated transcript", rendered)
             self.assertTrue(imported.exists())
@@ -256,7 +304,9 @@ exit 42
             self.assertIn("Audio import failed after subtitles were extracted", result.stderr)
             self.assertIn("no local listening audio was created", result.stderr)
             self.assertIn("Audio Hijack", result.stderr)
-            self.assertIn("字幕だけ成功", output.read_text(encoding="utf-8"))
+            rendered = output.read_text(encoding="utf-8")
+            self.assertIn("# Original Video Title", rendered)
+            self.assertIn("字幕だけ成功", rendered)
             self.assertFalse((tmpdir / "transcribe.log").exists())
 
     def test_local_input_derives_title_from_input_path(self) -> None:

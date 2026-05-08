@@ -13,7 +13,7 @@ Use this skill when the user wants ListenKit to produce transcript artifacts fro
 2. Choose the output Markdown path and user-facing language label.
 3. Run `cli/generate-markdown.sh` once with the matching input option.
 
-The wrapper derives the ASR locale from `--language` and derives the Markdown title from the source filename. Use optional `--locale` or `--title` only when the user needs an override.
+The wrapper derives the ASR locale from `--language`. For URL input, it defaults the Markdown title to the video's platform title when available; for local input, it derives the title from the source filename. Use optional `--locale` or `--title` only when the user needs an override.
 
 For `--output work/name.md`, the wrapper writes both `work/name.md` and `work/name.json`. Use the Markdown for readable transcript output and the JSON for downstream structured transformations.
 
