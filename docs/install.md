@@ -1,10 +1,14 @@
 # Install
 
+This document covers system dependencies, backend initialization, and troubleshooting. Normal users and external agents should run `cli/generate-markdown.sh`; commands such as `cli/transcribe-audio.sh` are backend or debugging references, not the public agent entrypoint.
+
 ## Dependencies
 
 ```bash
 brew install yt-dlp ffmpeg
 ```
+
+Linux users should install equivalent `yt-dlp` and `ffmpeg` packages with their system package manager.
 
 Python 3.10+ is required for `cli/render-listening-note.py` and tests.
 

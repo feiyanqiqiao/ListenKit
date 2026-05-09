@@ -1,14 +1,45 @@
 # ListenKit
 
-Local-first multilingual audio and video transcription toolchain, with optional agent adapters.
+Local-first multilingual audio and video transcription toolchain. ListenKit turns URL or local media input into plain transcript Markdown plus same-stem transcript JSON.
 
-This project turns foreign-language audio or video into normalized transcript artifacts. It is a small toolchain, not a language-learning system.
+## Quick Try
+
+```bash
+git clone <repo-url>
+cd ListenKit
+# macOS/Homebrew path. Linux users should install yt-dlp and ffmpeg with their package manager.
+brew install yt-dlp ffmpeg
+cli/generate-markdown.sh --help
+cli/generate-markdown.sh --url "https://example.com/video" --language Japanese --output work/sample.md --auto-init
+```
+
+This writes:
+
+```text
+work/sample.md
+work/sample.json
+```
+
+## Install For Your AI Agent
+
+If you know your agent rules or context path:
+
+```bash
+cli/install-agent-instructions.sh --target <your-agent-rules-file-or-dir>
+```
+
+If you do not know the target path yet, use the `--print` fallback described in `LLM_INTEGRATION.md`.
+
+## Documentation
+
+- `LLM_INTEGRATION.md`: AI/agent install and usage contract
+- `docs/install.md`: dependencies, backend setup, and troubleshooting
+- `docs/debugging.md`: lower-level maintenance and debugging interfaces
+- `docs/output-format.md`: transcript Markdown and JSON output shape
 
 ## What It Does
 
 ```text
-Public entrypoint:
-
 URL or local media
   -> cli/generate-markdown.sh
   -> transcript Markdown + same-stem transcript JSON
@@ -28,52 +59,18 @@ Output:
 ## What It Is Not
 
 - Not tied to Codex. Codex is only one adapter.
-- Not tied to Japanese. Japanese and English are the first sample languages.
+- Not tied to Japanese. Japanese, English, Chinese, and Korean labels are supported by the public CLI.
 - Not a note-taking, language-learning, Obsidian, Anki, or spaced-repetition system.
 - Not a source of copyrighted audio or transcripts.
 
-## Requirements
-
-- Python 3.10+ for the default local `faster-whisper` backend
-- macOS for the optional Apple Speech backend
-- `yt-dlp` for URL import
-- `ffmpeg` for audio conversion
-- Python 3.10+ for Markdown rendering and tests
-- Xcode command line tools for the optional Apple Speech helper build
-
-Install common dependencies:
-
-```bash
-brew install yt-dlp ffmpeg
-```
-
-## Quick Example
-
-```bash
-cli/generate-markdown.sh \
-  --url "https://example.com/video" \
-  --language Japanese \
-  --output work/sample-transcript.md \
-  --auto-init
-```
-
-The command derives the ASR locale from `--language`. For URL input, the Markdown title defaults to the video's platform title when available; for local input, it defaults to the source filename. The default backend is `faster-whisper small` on CPU with `int8` compute. This is the recommended starting point for an 8 GB Mac. On first use, pass `--auto-init` to let ListenKit create `ListenKit/.venv` and install `faster-whisper`; advanced users can run `cli/init-faster-whisper.sh` once or set `FASTER_WHISPER_PYTHON=/path/to/python`. Do not run `python3 -m venv .venv` from a parent directory, because that creates an environment outside the ListenKit repo. To use the bundled Apple Speech helper instead, pass `--engine apple`; if your Apple Speech helper lives outside this repository, set `APPLE_SPEECH_HELPER=/path/to/helper`.
-
-This writes `work/sample-transcript.md` and `work/sample-transcript.json`. For URL input, ListenKit first tries platform subtitles through its wrapper. If usable subtitles are found, they become the transcript source and ASR is skipped, but ListenKit still attempts to import local audio. If subtitles are unavailable, the command falls back to audio import plus ASR.
-
 ## Adapters
 
+- Generic agent instructions: `adapters/agent/listenkit-agent-instructions.md`
 - Codex: `adapters/codex/SKILL.md`
 - Claude: `adapters/claude/CLAUDE.md`
 - Cursor: `adapters/cursor/foreign-listening.md`
 
 Adapters should call the public `cli/generate-markdown.sh` entrypoint for normal use, then consume either the generated Markdown or same-stem JSON. They should not reimplement import, subtitle extraction, transcription, rendering, or downstream note systems.
-
-## For Agents And Integrators
-
-External LLM agents should follow `LLM_INTEGRATION.md`. In normal integrations, `cli/generate-markdown.sh` is the only public entrypoint.
-
-Lower-level commands and backend helpers are maintenance/debugging interfaces, documented in `docs/debugging.md`.
 
 ## Privacy and Copyright
 
