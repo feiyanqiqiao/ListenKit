@@ -159,6 +159,7 @@ fi
 helper="${LISTENKIT_FASTER_WHISPER_HELPER:-$repo_root/tools/faster-whisper/transcribe.py}"
 repo_venv_python="${LISTENKIT_FASTER_WHISPER_VENV_PYTHON:-$repo_root/.venv/bin/python}"
 init_script="${LISTENKIT_INIT_FASTER_WHISPER:-$repo_root/cli/init-faster-whisper.sh}"
+faster_whisper_model="small"
 
 python_can_import_faster_whisper() {
   local candidate="$1"
@@ -172,6 +173,31 @@ initialize_faster_whisper() {
     return 1
   fi
   "$init_script"
+}
+
+hf_hub_cache_dir() {
+  if [[ -n "${HF_HUB_CACHE:-}" ]]; then
+    printf '%s\n' "$HF_HUB_CACHE"
+  elif [[ -n "${HF_HOME:-}" ]]; then
+    printf '%s\n' "${HF_HOME%/}/hub"
+  else
+    printf '%s\n' "$HOME/.cache/huggingface/hub"
+  fi
+}
+
+faster_whisper_model_is_cached() {
+  local model="$1"
+  local model_root
+  model_root="$(hf_hub_cache_dir)/models--Systran--faster-whisper-${model}/snapshots"
+  [[ -d "$model_root" ]] || return 1
+  find "$model_root" -mindepth 2 -maxdepth 2 -name model.bin -type f -print -quit | grep -q .
+}
+
+enable_offline_hf_if_cached() {
+  if faster_whisper_model_is_cached "$faster_whisper_model"; then
+    export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+    export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
+  fi
 }
 
 python_executable="${FASTER_WHISPER_PYTHON:-}"
@@ -245,8 +271,10 @@ if [[ ! -f "$helper" ]]; then
   exit 1
 fi
 
+enable_offline_hf_if_cached
+
 run_and_write "$python_executable" "$helper" "$audio_path" \
   --locale "$locale" \
-  --model small \
+  --model "$faster_whisper_model" \
   --compute-type int8 \
   --beam-size 5

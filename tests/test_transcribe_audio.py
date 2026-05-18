@@ -117,6 +117,54 @@ class TranscribeAudioTests(unittest.TestCase):
             self.assertIn('"engine":"faster-whisper"', rendered)
             self.assertIn('"compute_type":"int8"', rendered)
 
+    def test_cached_faster_whisper_model_forces_huggingface_offline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.m4a"
+            helper = Path(tmpdir) / "helper.sh"
+            output = Path(tmpdir) / "transcript.json"
+            fake_python = Path(tmpdir) / "python"
+            env_log = Path(tmpdir) / "env.log"
+            hf_home = Path(tmpdir) / "hf"
+            snapshot = hf_home / "hub" / "models--Systran--faster-whisper-small" / "snapshots" / "abc123"
+            snapshot.mkdir(parents=True)
+            (snapshot / "model.bin").write_bytes(b"cached")
+            audio.write_bytes(b"fake")
+            self.write_fake_python(fake_python)
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                f"printf 'HF_HUB_OFFLINE=%s\\n' \"${{HF_HUB_OFFLINE:-}}\" > {str(env_log)!r}\n"
+                f"printf 'TRANSFORMERS_OFFLINE=%s\\n' \"${{TRANSFORMERS_OFFLINE:-}}\" >> {str(env_log)!r}\n"
+                "printf '{\"engine\":\"faster-whisper\",\"model\":\"small\",\"compute_type\":\"int8\",\"locale\":\"ja-JP\",\"language\":\"ja\",\"full_text\":\"ok\",\"segments\":[],\"timing_complete\":true}\\n'\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+            env = os.environ.copy()
+            env.pop("HF_HUB_OFFLINE", None)
+            env.pop("TRANSFORMERS_OFFLINE", None)
+            env["HF_HOME"] = str(hf_home)
+            env["FASTER_WHISPER_PYTHON"] = str(fake_python)
+            env["LISTENKIT_FASTER_WHISPER_HELPER"] = str(helper)
+            result = subprocess.run(
+                [
+                    str(TRANSCRIBE_SCRIPT),
+                    "--audio-path",
+                    str(audio),
+                    "--locale",
+                    "ja-JP",
+                    "--output",
+                    str(output),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            env_text = env_log.read_text(encoding="utf-8")
+            self.assertIn("HF_HUB_OFFLINE=1", env_text)
+            self.assertIn("TRANSFORMERS_OFFLINE=1", env_text)
+
     def test_repo_local_venv_python_is_used_without_env_override(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             audio = Path(tmpdir) / "sample.m4a"
