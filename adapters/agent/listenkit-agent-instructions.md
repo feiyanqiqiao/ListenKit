@@ -45,3 +45,15 @@ Do not call these directly as an integration shortcut:
 Those are dependency, maintenance, or debugging interfaces. If `yt-dlp`, `ffmpeg`, Python, or backend initialization is missing, ask the user to install or authorize the missing dependency instead of bypassing `cli/generate-markdown.sh`.
 
 ListenKit stops at plain transcript Markdown and same-stem transcript JSON. Downstream summaries, learning notes, vocabulary lists, cards, or app-specific records are separate transformations after ListenKit output exists.
+
+If a downstream workflow has already selected explicit time ranges, export clips through the supported supplemental interface instead of calling `ffmpeg` directly:
+
+```bash
+cli/export-audio-slices.py \
+  --input <audio> \
+  --manifest <json> \
+  --output-dir <dir> \
+  --padding-seconds 0.15
+```
+
+The downstream workflow remains responsible for deciding what each time range means.

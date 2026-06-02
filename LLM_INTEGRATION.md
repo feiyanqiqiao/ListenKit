@@ -66,6 +66,32 @@ Downstream agents may consume either artifact:
 - Use Markdown when the next step needs a readable transcript.
 - Use JSON when the next step needs structured text, segments, timing, or engine metadata.
 
+## Optional Audio Slice Export
+
+When a downstream workflow has already selected audio time ranges, export the clips through ListenKit:
+
+```bash
+cli/export-audio-slices.py \
+  --input work/audio/source.m4a \
+  --manifest work/source.slices.json \
+  --output-dir work/slices \
+  --padding-seconds 0.15 \
+  --overwrite
+```
+
+The manifest is intentionally generic:
+
+```json
+{
+  "version": 1,
+  "slices": [
+    {"id": "S01", "start": 4.0, "end": 19.0}
+  ]
+}
+```
+
+ListenKit validates the ranges, applies bounded padding, exports non-empty `SNN.m4a` files, and prints a JSON report. The downstream workflow still owns semantic grouping, labels, learning-note rendering, and application-specific records.
+
 ## Downstream Transformations
 
 ListenKit stops at transcript normalization and plain transcript rendering. After the Markdown or JSON exists, downstream agents may transform it into their own products, such as summaries, learning notes, vocabulary lists, review cards, or app-specific records.
@@ -87,3 +113,5 @@ In normal integrations, do not call these directly as a shortcut:
 These are dependency, maintenance, or debugging interfaces. Calling them directly can skip ListenKit's subtitle priority, cleanup, ASR fallback, output naming, provenance, or transcript JSON normalization behavior.
 
 Use direct low-level calls only when debugging ListenKit itself or maintaining the pipeline. See `docs/debugging.md`.
+
+`cli/export-audio-slices.py` is the supported exception: downstream workflows may call it after they have selected explicit time ranges.
