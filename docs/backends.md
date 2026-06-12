@@ -26,6 +26,8 @@ The faster-whisper Python selection order is:
 
 Non-interactive callers should pass `--auto-init` or run `cli/init-faster-whisper.sh` before transcription.
 
+`ListenKit/.venv` is owned exclusively by ListenKit. Downstream projects must call ListenKit through its CLI and JSON contract; they must not import packages from this environment. `cli/check-runtime.sh` verifies Python 3.14, the installed faster-whisper distribution, and a bounded import without modifying the environment.
+
 Avoid documenting or using raw `python3 -m venv .venv` setup commands. They are working-directory dependent and can create the virtual environment outside the ListenKit repository.
 
 Fixed faster-whisper defaults:
@@ -45,6 +47,7 @@ The bundled helper is built from `tools/apple-speech-helper/` on first use. It l
 
 Any helper must return:
 
+- `schema_version` (`1` for current built-in backends)
 - `engine`
 - `locale`
 - `full_text`
@@ -52,6 +55,8 @@ Any helper must return:
 - `timing_complete`
 
 The subtitle backend uses the same transcript JSON shape. It is only used for URL input by `cli/generate-markdown.sh`; `cli/transcribe-audio.sh` remains a local audio ASR command.
+
+Readers accept legacy payloads without `schema_version` as v1 for compatibility. An explicit version other than `1` is unsupported and must fail before rendering or downstream processing.
 
 If a backend fails after producing JSON, it should return an `error` object as the first top-level field:
 

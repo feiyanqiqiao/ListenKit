@@ -78,6 +78,7 @@ def main() -> int:
         raise SystemExit(f"No usable subtitle cues found in: {args.vtt}")
 
     payload = {
+        "schema_version": 1,
         "engine": "yt-dlp-subtitles",
         "locale": args.locale,
         "subtitle_kind": args.subtitle_kind,

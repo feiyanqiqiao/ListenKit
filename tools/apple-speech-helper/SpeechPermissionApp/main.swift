@@ -16,6 +16,7 @@ struct ErrorPayload: Codable {
 }
 
 struct TranscriptionPayload: Codable {
+    let schemaVersion: Int
     let error: ErrorPayload?
     let engine: String
     let locale: String
@@ -24,6 +25,7 @@ struct TranscriptionPayload: Codable {
     let timingComplete: Bool
 
     enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
         case error
         case engine
         case locale
@@ -210,6 +212,7 @@ final class SpeechFileTranscriber {
             try await analyzer.start(inputAudioFile: audioFile, finishAfterFile: true)
             let collected = try await collectorTask.value
             return TranscriptionPayload(
+                schemaVersion: 1,
                 error: nil,
                 engine: "apple",
                 locale: Self.bcp47Identifier(for: resolvedLocale),
@@ -363,6 +366,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return 0
         } catch let helperError as HelperError {
             let payload = TranscriptionPayload(
+                schemaVersion: 1,
                 error: ErrorPayload(type: helperError.errorType, message: helperError.localizedDescription),
                 engine: "apple",
                 locale: "unknown",
@@ -374,6 +378,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return 1
         } catch {
             let payload = TranscriptionPayload(
+                schemaVersion: 1,
                 error: ErrorPayload(type: "unknown", message: error.localizedDescription),
                 engine: "apple",
                 locale: "unknown",
