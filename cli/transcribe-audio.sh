@@ -11,7 +11,7 @@ Options:
   --locale <bcp47>         Speech locale, for example ja-JP or en-US
   --engine <name>          ASR backend. Defaults to faster-whisper
   --output <json>          Optional output JSON path
-  --auto-init              Allow ListenKit to create .venv and install faster-whisper when missing
+  --auto-init              Allow ListenKit to create its local Cache runtime and install faster-whisper when missing
   --help                   Show this help
 EOF
 }
@@ -157,7 +157,8 @@ EOF
 fi
 
 helper="${LISTENKIT_FASTER_WHISPER_HELPER:-$repo_root/tools/faster-whisper/transcribe.py}"
-repo_venv_python="${LISTENKIT_FASTER_WHISPER_VENV_PYTHON:-$repo_root/.venv/bin/python}"
+runtime_dir="${LISTENKIT_FASTER_WHISPER_VENV_DIR:-${HOME}/Library/Caches/ListenKit/venvs/cpython-314}"
+repo_venv_python="${LISTENKIT_FASTER_WHISPER_VENV_PYTHON:-${runtime_dir}/bin/python}"
 init_script="${LISTENKIT_INIT_FASTER_WHISPER:-$repo_root/cli/init-faster-whisper.sh}"
 faster_whisper_model="small"
 import_timeout_seconds="${LISTENKIT_FASTER_WHISPER_IMPORT_TIMEOUT_SECONDS:-60}"
@@ -244,7 +245,7 @@ else
     if [[ "$auto_init" == "true" || "${LISTENKIT_AUTO_INIT:-}" == "1" ]]; then
       python_executable="$(initialize_faster_whisper)"
     elif [[ -t 0 ]]; then
-      printf 'ListenKit needs faster-whisper installed in %s. Install now? [y/N] ' "$repo_root/.venv" >&2
+      printf 'ListenKit needs faster-whisper installed in %s. Install now? [y/N] ' "$runtime_dir" >&2
       read -r answer
       case "$answer" in
         y|Y|yes|YES)

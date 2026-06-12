@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-python_executable="$repo_root/.venv/bin/python"
+python_executable="${HOME}/Library/Caches/ListenKit/venvs/cpython-314/bin/python"
 import_timeout_seconds="${LISTENKIT_FASTER_WHISPER_IMPORT_TIMEOUT_SECONDS:-60}"
 
 usage() {
@@ -56,6 +56,7 @@ if sys.version_info[:2] != (3, 14):
 print(f"python_executable={sys.executable}")
 print(f"python_version={sys.version.split()[0]}")
 print(f"abi_tag={sys.implementation.cache_tag}")
+print(f"runtime_prefix={sys.prefix}")
 try:
     print(f"faster_whisper_version={importlib.metadata.version('faster-whisper')}")
 except importlib.metadata.PackageNotFoundError as exc:
@@ -68,6 +69,12 @@ PY
 }
 
 installed_version="$(printf '%s\n' "$runtime_metadata" | awk -F= '$1 == "faster_whisper_version" {print $2}')"
+runtime_prefix="$(printf '%s\n' "$runtime_metadata" | awk -F= '$1 == "runtime_prefix" {sub(/^[^=]*=/, ""); print}')"
+if [[ "$runtime_prefix" == *"/Library/Mobile Documents/"* ]]; then
+  echo "ListenKit native runtime cannot use an iCloud-backed path: $runtime_prefix" >&2
+  echo "Repair: $repo_root/cli/init-faster-whisper.sh" >&2
+  exit 1
+fi
 if [[ "$installed_version" != "1.2.1" ]]; then
   echo "ListenKit requires faster-whisper 1.2.1, got ${installed_version:-unknown}: $python_executable" >&2
   echo "Repair: $repo_root/cli/init-faster-whisper.sh" >&2

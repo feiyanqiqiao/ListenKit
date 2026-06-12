@@ -10,7 +10,9 @@ brew install yt-dlp ffmpeg
 
 Linux users should install equivalent `yt-dlp` and `ffmpeg` packages with their system package manager.
 
-Homebrew Python 3.14 is required for the repo-local faster-whisper runtime. Other lightweight maintenance scripts remain compatible with Python 3.10+, but the supported ASR environment is `ListenKit/.venv` built from Python 3.14.
+Homebrew Python 3.14 is required for the faster-whisper runtime. Other lightweight maintenance scripts remain compatible with Python 3.10+, but the supported ASR environment is `~/Library/Caches/ListenKit/venvs/cpython-314`, built from Python 3.14.
+
+The runtime is deliberately stored outside the repository and outside iCloud Drive. It contains large native libraries whose loading can stall while iCloud is hydrating or coordinating files. Do not place the runtime under `Library/Mobile Documents`.
 
 The optional Apple Speech backend requires macOS with Speech APIs and Xcode command line tools for the bundled Swift helper build.
 
@@ -22,7 +24,7 @@ The default ASR backend is `faster-whisper`:
 cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP --auto-init
 ```
 
-`--auto-init` authorizes ListenKit to create repo-local `ListenKit/.venv`, install `faster-whisper`, and continue transcription. For a one-time manual setup, run this script from anywhere:
+`--auto-init` authorizes ListenKit to create the local Cache runtime, install `faster-whisper`, and continue transcription. For a one-time manual setup, run this script from anywhere:
 
 ```bash
 cli/init-faster-whisper.sh
@@ -36,7 +38,14 @@ Check an existing environment without changing it:
 cli/check-runtime.sh
 ```
 
-Do not initialize with `python3 -m venv .venv` from a parent directory. That command depends on your current working directory and can create a misplaced environment such as `<vault-parent>/.venv`. The ListenKit init script derives the target directory from its own path.
+Do not initialize with `python3 -m venv .venv` in the repository. Use the ListenKit initializer so the native runtime remains outside iCloud and uses the supported Python version.
+
+To use a different runtime location, set `LISTENKIT_FASTER_WHISPER_VENV_DIR`. The target must remain outside iCloud Drive:
+
+```bash
+LISTENKIT_FASTER_WHISPER_VENV_DIR=/path/outside/icloud \
+  cli/init-faster-whisper.sh
+```
 
 Advanced users can use an external Python environment:
 
@@ -61,6 +70,7 @@ Common faster-whisper failures:
 - model download is blocked or incomplete
 - the audio file is missing or unreadable
 - the selected runtime is not Python 3.14
+- the selected runtime is stored in iCloud Drive
 - the import health check exceeds 60 seconds
 
 ## Apple Speech Backend

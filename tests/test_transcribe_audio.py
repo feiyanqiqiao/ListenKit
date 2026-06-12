@@ -207,7 +207,7 @@ class TranscribeAudioTests(unittest.TestCase):
             self.assertIn("HF_HUB_OFFLINE=1", env_text)
             self.assertIn("TRANSFORMERS_OFFLINE=1", env_text)
 
-    def test_repo_local_venv_python_is_used_without_env_override(self) -> None:
+    def test_listenkit_runtime_python_is_used_without_env_override(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             audio = Path(tmpdir) / "sample.m4a"
             helper = Path(tmpdir) / "helper.sh"
@@ -248,6 +248,12 @@ class TranscribeAudioTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('"full_text":"repo venv"', output.read_text(encoding="utf-8"))
+
+    def test_default_runtime_path_is_local_cache_not_repo_venv(self) -> None:
+        script = TRANSCRIBE_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn('${HOME}/Library/Caches/ListenKit/venvs/cpython-314', script)
+        self.assertNotIn('$repo_root/.venv/bin/python', script)
 
     def test_auto_init_invokes_init_script_and_continues(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
