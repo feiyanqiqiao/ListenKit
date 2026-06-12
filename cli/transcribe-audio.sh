@@ -160,11 +160,29 @@ helper="${LISTENKIT_FASTER_WHISPER_HELPER:-$repo_root/tools/faster-whisper/trans
 repo_venv_python="${LISTENKIT_FASTER_WHISPER_VENV_PYTHON:-$repo_root/.venv/bin/python}"
 init_script="${LISTENKIT_INIT_FASTER_WHISPER:-$repo_root/cli/init-faster-whisper.sh}"
 faster_whisper_model="small"
+import_timeout_seconds="${LISTENKIT_FASTER_WHISPER_IMPORT_TIMEOUT_SECONDS:-60}"
+
+if [[ ! "$import_timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
+  echo "LISTENKIT_FASTER_WHISPER_IMPORT_TIMEOUT_SECONDS must be a positive integer." >&2
+  exit 1
+fi
 
 python_can_import_faster_whisper() {
   local candidate="$1"
+  local pid elapsed=0
   [[ -x "$candidate" ]] || return 1
-  "$candidate" -c 'import faster_whisper' >/dev/null 2>&1
+  "$candidate" -c 'import faster_whisper' >/dev/null 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if (( elapsed >= import_timeout_seconds )); then
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 1
+    ((elapsed += 1))
+  done
+  wait "$pid"
 }
 
 initialize_faster_whisper() {
@@ -203,24 +221,37 @@ enable_offline_hf_if_cached() {
 python_executable="${FASTER_WHISPER_PYTHON:-}"
 
 if [[ -n "$python_executable" ]]; then
-  if ! python_can_import_faster_whisper "$python_executable"; then
-    echo "FASTER_WHISPER_PYTHON cannot import faster_whisper: $python_executable" >&2
+  if python_can_import_faster_whisper "$python_executable"; then
+    :
+  else
+    import_status=$?
+    if [[ "$import_status" -eq 124 ]]; then
+      echo "FASTER_WHISPER_PYTHON import timed out after ${import_timeout_seconds} seconds: $python_executable" >&2
+    else
+      echo "FASTER_WHISPER_PYTHON cannot import faster_whisper: $python_executable" >&2
+    fi
     exit 1
   fi
-elif python_can_import_faster_whisper "$repo_venv_python"; then
-  python_executable="$repo_venv_python"
 else
-  if [[ "$auto_init" == "true" || "${LISTENKIT_AUTO_INIT:-}" == "1" ]]; then
-    python_executable="$(initialize_faster_whisper)"
-  elif [[ -t 0 ]]; then
-    printf 'ListenKit needs faster-whisper installed in %s. Install now? [y/N] ' "$repo_root/.venv" >&2
-    read -r answer
-    case "$answer" in
-      y|Y|yes|YES)
-        python_executable="$(initialize_faster_whisper)"
-        ;;
-      *)
-        cat >&2 <<EOF
+  if python_can_import_faster_whisper "$repo_venv_python"; then
+    python_executable="$repo_venv_python"
+  else
+    import_status=$?
+    if [[ "$import_status" -eq 124 ]]; then
+      echo "ListenKit faster-whisper import timed out after ${import_timeout_seconds} seconds: $repo_venv_python" >&2
+      exit 1
+    fi
+    if [[ "$auto_init" == "true" || "${LISTENKIT_AUTO_INIT:-}" == "1" ]]; then
+      python_executable="$(initialize_faster_whisper)"
+    elif [[ -t 0 ]]; then
+      printf 'ListenKit needs faster-whisper installed in %s. Install now? [y/N] ' "$repo_root/.venv" >&2
+      read -r answer
+      case "$answer" in
+        y|Y|yes|YES)
+          python_executable="$(initialize_faster_whisper)"
+          ;;
+        *)
+          cat >&2 <<EOF
 faster-whisper initialization was not approved.
 
 Run one of:
@@ -229,11 +260,11 @@ Run one of:
 
 Use --engine apple to force the Apple Speech backend instead.
 EOF
-        exit 1
-        ;;
-    esac
-  else
-    cat >&2 <<EOF
+          exit 1
+          ;;
+      esac
+    else
+      cat >&2 <<EOF
 faster-whisper is not initialized for ListenKit.
 
 Run one of:
@@ -246,11 +277,19 @@ Or set:
 
 Use --engine apple to force the Apple Speech backend instead.
 EOF
-    exit 1
+      exit 1
+    fi
   fi
 fi
 
-if ! python_can_import_faster_whisper "$python_executable"; then
+if python_can_import_faster_whisper "$python_executable"; then
+  :
+else
+  import_status=$?
+  if [[ "$import_status" -eq 124 ]]; then
+    echo "faster-whisper import timed out after ${import_timeout_seconds} seconds: $python_executable" >&2
+    exit 1
+  fi
   cat >&2 <<EOF
 faster-whisper is not importable from:
   $python_executable
