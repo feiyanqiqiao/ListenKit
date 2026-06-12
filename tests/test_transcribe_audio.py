@@ -117,6 +117,48 @@ class TranscribeAudioTests(unittest.TestCase):
             self.assertIn('"engine":"faster-whisper"', rendered)
             self.assertIn('"compute_type":"int8"', rendered)
 
+    def test_explicit_faster_whisper_python_import_times_out(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.m4a"
+            helper = Path(tmpdir) / "helper.sh"
+            fake_python = Path(tmpdir) / "python"
+            audio.write_bytes(b"fake")
+            fake_python.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$1\" == \"-c\" ]]; then\n"
+                "  sleep 3\n"
+                "  exit 0\n"
+                "fi\n"
+                "exec /bin/sh \"$@\"\n",
+                encoding="utf-8",
+            )
+            fake_python.chmod(0o755)
+            helper.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            helper.chmod(0o755)
+            env = os.environ.copy()
+            env["FASTER_WHISPER_PYTHON"] = str(fake_python)
+            env["LISTENKIT_FASTER_WHISPER_HELPER"] = str(helper)
+            env["LISTENKIT_FASTER_WHISPER_IMPORT_TIMEOUT_SECONDS"] = "1"
+
+            result = subprocess.run(
+                [
+                    str(TRANSCRIBE_SCRIPT),
+                    "--audio-path",
+                    str(audio),
+                    "--locale",
+                    "ja-JP",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+                timeout=8,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("timed out after 1 seconds", result.stderr)
+
     def test_cached_faster_whisper_model_forces_huggingface_offline(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             audio = Path(tmpdir) / "sample.m4a"
