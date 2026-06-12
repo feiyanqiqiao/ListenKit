@@ -11,6 +11,34 @@ RENDER_SCRIPT = REPO_ROOT / "cli" / "render-listening-note.py"
 
 
 class RenderListeningNoteTests(unittest.TestCase):
+    def run_payload(self, payload: dict) -> subprocess.CompletedProcess[str]:
+        tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tmpdir.cleanup)
+        root = Path(tmpdir.name)
+        transcript = root / "transcript.json"
+        output = root / "note.md"
+        transcript.write_text(json.dumps(payload), encoding="utf-8")
+        return subprocess.run(
+            [
+                sys.executable,
+                str(RENDER_SCRIPT),
+                "--audio-path",
+                str(root / "sample.m4a"),
+                "--transcript-json",
+                str(transcript),
+                "--title",
+                "Schema Test",
+                "--language",
+                "Japanese",
+                "--output",
+                str(output),
+            ],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
     def render_sample(self, sample_name: str, language: str) -> str:
         with tempfile.TemporaryDirectory() as tmpdir:
             output = Path(tmpdir) / "note.md"
@@ -130,6 +158,48 @@ class RenderListeningNoteTests(unittest.TestCase):
             self.assertIn("Transcript JSON contains ASR error", result.stderr)
             self.assertIn("mock_error", result.stderr)
             self.assertFalse(output.exists())
+
+    def test_accepts_schema_version_one(self) -> None:
+        result = self.run_payload(
+            {
+                "schema_version": 1,
+                "engine": "faster-whisper",
+                "locale": "ja-JP",
+                "full_text": "正常です。",
+                "segments": [],
+                "timing_complete": True,
+            }
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_accepts_legacy_payload_without_schema_version(self) -> None:
+        result = self.run_payload(
+            {
+                "engine": "apple",
+                "locale": "ja-JP",
+                "full_text": "legacy",
+                "segments": [],
+                "timing_complete": True,
+            }
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_rejects_unknown_schema_version(self) -> None:
+        result = self.run_payload(
+            {
+                "schema_version": 2,
+                "engine": "faster-whisper",
+                "locale": "ja-JP",
+                "full_text": "future",
+                "segments": [],
+                "timing_complete": True,
+            }
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unsupported transcript schema_version: 2", result.stderr)
 
 
 if __name__ == "__main__":

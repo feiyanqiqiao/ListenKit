@@ -1,0 +1,2 @@
+# Direct dependency only. Transitive versions are resolved by faster-whisper.
+faster-whisper==1.2.1

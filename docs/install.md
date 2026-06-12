@@ -10,7 +10,7 @@ brew install yt-dlp ffmpeg
 
 Linux users should install equivalent `yt-dlp` and `ffmpeg` packages with their system package manager.
 
-Python 3.10+ is required for `cli/render-listening-note.py` and tests.
+Homebrew Python 3.14 is required for the repo-local faster-whisper runtime. Other lightweight maintenance scripts remain compatible with Python 3.10+, but the supported ASR environment is `ListenKit/.venv` built from Python 3.14.
 
 The optional Apple Speech backend requires macOS with Speech APIs and Xcode command line tools for the bundled Swift helper build.
 
@@ -26,6 +26,14 @@ cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP --auto
 
 ```bash
 cli/init-faster-whisper.sh
+```
+
+The initializer installs the direct dependency pinned in `requirements-faster-whisper.txt`. Transitive packages such as CTranslate2, ONNX Runtime, and PyAV are selected by faster-whisper's dependency constraints. The runtime snapshot under `docs/runtime-snapshot-python314.txt` is diagnostic evidence only and is not an installation lock file.
+
+Check an existing environment without changing it:
+
+```bash
+cli/check-runtime.sh
 ```
 
 Do not initialize with `python3 -m venv .venv` from a parent directory. That command depends on your current working directory and can create a misplaced environment such as `<vault-parent>/.venv`. The ListenKit init script derives the target directory from its own path.
@@ -52,6 +60,8 @@ Common faster-whisper failures:
 - `faster-whisper` is not installed in the selected Python environment
 - model download is blocked or incomplete
 - the audio file is missing or unreadable
+- the selected runtime is not Python 3.14
+- the import health check exceeds 60 seconds
 
 ## Apple Speech Backend
 

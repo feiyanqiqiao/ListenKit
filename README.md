@@ -36,6 +36,7 @@ If you do not know the target path yet, use the `--print` fallback described in 
 - `docs/install.md`: dependencies, backend setup, and troubleshooting
 - `docs/debugging.md`: lower-level maintenance and debugging interfaces
 - `docs/output-format.md`: transcript Markdown and JSON output shape
+- `cli/check-runtime.sh`: read-only Python 3.14 and faster-whisper health check
 
 ## What It Does
 

@@ -62,6 +62,7 @@ VTT
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads((tmpdir / "transcript.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["schema_version"], 1)
             self.assertEqual(payload["engine"], "yt-dlp-subtitles")
             self.assertEqual(payload["subtitle_kind"], "manual")
             self.assertEqual(payload["locale"], "ja-JP")

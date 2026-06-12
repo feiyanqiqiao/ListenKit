@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Any
 
 
+CURRENT_TRANSCRIPT_SCHEMA_VERSION = 1
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render transcript JSON as plain Markdown.")
     parser.add_argument("--audio-path")
@@ -36,6 +39,10 @@ def load_transcript(path: Path) -> dict[str, Any]:
             message = error.get("message", "transcription failed")
             raise SystemExit(f"Transcript JSON contains ASR error: {error_type}: {message}")
         raise SystemExit(f"Transcript JSON contains ASR error: {error}")
+
+    schema_version = payload.get("schema_version")
+    if schema_version is not None and schema_version != CURRENT_TRANSCRIPT_SCHEMA_VERSION:
+        raise SystemExit(f"Unsupported transcript schema_version: {schema_version}")
 
     required = ["engine", "locale", "full_text", "segments", "timing_complete"]
     missing = [key for key in required if key not in payload]

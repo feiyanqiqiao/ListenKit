@@ -29,6 +29,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 venv_dir="$repo_root/.venv"
 python_executable="$venv_dir/bin/python"
+requirements_file="$repo_root/requirements-faster-whisper.txt"
 import_timeout_seconds="${LISTENKIT_FASTER_WHISPER_IMPORT_TIMEOUT_SECONDS:-60}"
 
 if [[ ! "$import_timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
@@ -61,6 +62,11 @@ python_can_import_faster_whisper() {
     ((elapsed += 1))
   done
   wait "$pid"
+}
+
+python_has_expected_faster_whisper_version() {
+  local candidate="$1"
+  "$candidate" -c 'import importlib.metadata; raise SystemExit(0 if importlib.metadata.version("faster-whisper") == "1.2.1" else 1)' >/dev/null 2>&1
 }
 
 select_bootstrap_python() {
@@ -110,7 +116,7 @@ PY
 fi
 
 if [[ -x "$python_executable" ]]; then
-  if python_can_import_faster_whisper "$python_executable"; then
+  if python_can_import_faster_whisper "$python_executable" && python_has_expected_faster_whisper_version "$python_executable"; then
     printf '%s\n' "$python_executable"
     exit 0
   else
@@ -132,9 +138,9 @@ if [[ ! -x "$python_executable" ]]; then
 fi
 
 "$python_executable" -m pip install --upgrade pip >&2
-"$python_executable" -m pip install faster-whisper >&2
+"$python_executable" -m pip install -r "$requirements_file" >&2
 
-if python_can_import_faster_whisper "$python_executable"; then
+if python_can_import_faster_whisper "$python_executable" && python_has_expected_faster_whisper_version "$python_executable"; then
   :
 else
   import_status=$?

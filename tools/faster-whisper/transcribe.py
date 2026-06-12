@@ -34,6 +34,7 @@ def main() -> int:
     if not audio_path.exists():
         return emit(
             {
+                "schema_version": 1,
                 "error": {
                     "type": "file_not_found",
                     "message": f"Audio file not found: {audio_path}",
@@ -64,6 +65,7 @@ def main() -> int:
         ]
         return emit(
             {
+                "schema_version": 1,
                 "engine": "faster-whisper",
                 "model": args.model,
                 "compute_type": args.compute_type,
@@ -79,6 +81,7 @@ def main() -> int:
         print(f"faster-whisper failed: {exc}", file=sys.stderr)
         return emit(
             {
+                "schema_version": 1,
                 "error": {
                     "type": exc.__class__.__name__,
                     "message": str(exc),
