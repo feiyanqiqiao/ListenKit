@@ -8,6 +8,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECK_RUNTIME = REPO_ROOT / "cli" / "check-runtime.sh"
+DEFAULT_RUNTIME_PYTHON = Path.home() / "Library/Caches/ListenKit/venvs/cpython-314/bin/python"
 FASTER_WHISPER_HELPER = REPO_ROOT / "tools" / "faster-whisper" / "transcribe.py"
 APPLE_HELPER_SOURCE = REPO_ROOT / "tools" / "apple-speech-helper" / "SpeechPermissionApp" / "main.swift"
 
@@ -28,7 +29,7 @@ class RuntimeContractTests(unittest.TestCase):
 
     def test_faster_whisper_error_payload_has_schema_version(self) -> None:
         result = subprocess.run(
-            [str(REPO_ROOT / ".venv" / "bin" / "python"), str(FASTER_WHISPER_HELPER), "/missing/audio.mp3"],
+            [str(DEFAULT_RUNTIME_PYTHON), str(FASTER_WHISPER_HELPER), "/missing/audio.mp3"],
             check=False,
             text=True,
             stdout=subprocess.PIPE,
@@ -63,6 +64,32 @@ class RuntimeContractTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("requires faster-whisper 1.2.1", result.stderr)
+
+    def test_runtime_check_rejects_icloud_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_python = Path(tmpdir) / "python"
+            fake_python.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$1\" == \"-\" ]]; then\n"
+                "  printf 'python_executable=%s\\npython_version=3.14.3\\nabi_tag=cpython-314\\nruntime_prefix=/Users/test/Library/Mobile Documents/ListenKit/.venv\\nfaster_whisper_version=1.2.1\\n' \"$0\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == \"-c\" ]]; then exit 0; fi\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            os.chmod(fake_python, 0o755)
+
+            result = subprocess.run(
+                [str(CHECK_RUNTIME), "--python", str(fake_python)],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("iCloud-backed", result.stderr)
 
     def test_apple_helper_declares_schema_version(self) -> None:
         source = APPLE_HELPER_SOURCE.read_text(encoding="utf-8")

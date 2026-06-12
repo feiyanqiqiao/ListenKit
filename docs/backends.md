@@ -21,14 +21,17 @@ cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> --auto-init
 The faster-whisper Python selection order is:
 
 1. `FASTER_WHISPER_PYTHON`
-2. repo-local `ListenKit/.venv/bin/python`
-3. authorized initialization through `--auto-init`, `LISTENKIT_AUTO_INIT=1`, or an interactive TTY prompt
+2. `LISTENKIT_FASTER_WHISPER_VENV_PYTHON`, when explicitly set
+3. `~/Library/Caches/ListenKit/venvs/cpython-314/bin/python`
+4. authorized initialization through `--auto-init`, `LISTENKIT_AUTO_INIT=1`, or an interactive TTY prompt
 
 Non-interactive callers should pass `--auto-init` or run `cli/init-faster-whisper.sh` before transcription.
 
-`ListenKit/.venv` is owned exclusively by ListenKit. Downstream projects must call ListenKit through its CLI and JSON contract; they must not import packages from this environment. `cli/check-runtime.sh` verifies Python 3.14, the installed faster-whisper distribution, and a bounded import without modifying the environment.
+The Cache runtime is owned exclusively by ListenKit. Downstream projects must call ListenKit through its CLI and JSON contract; they must not import packages from this environment. `cli/check-runtime.sh` verifies Python 3.14, the runtime location, the installed faster-whisper distribution, and a bounded import without modifying the environment.
 
-Avoid documenting or using raw `python3 -m venv .venv` setup commands. They are working-directory dependent and can create the virtual environment outside the ListenKit repository.
+The runtime must not live under iCloud Drive (`Library/Mobile Documents`). It contains native libraries and model dependencies that need predictable local filesystem access. `LISTENKIT_FASTER_WHISPER_VENV_DIR` can override the default root, but the initializer and health check reject iCloud-backed targets.
+
+Avoid documenting or using raw `python3 -m venv .venv` setup commands. They bypass the supported runtime path and health checks.
 
 Fixed faster-whisper defaults:
 

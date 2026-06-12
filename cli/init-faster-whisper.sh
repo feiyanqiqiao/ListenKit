@@ -6,7 +6,7 @@ usage() {
 Usage:
   cli/init-faster-whisper.sh
 
-Create or reuse ListenKit's repo-local .venv, install faster-whisper,
+Create or reuse ListenKit's local Cache runtime, install faster-whisper,
 verify that it can be imported, and print the Python executable path.
 EOF
 }
@@ -27,13 +27,19 @@ done
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-venv_dir="$repo_root/.venv"
+venv_dir="${LISTENKIT_FASTER_WHISPER_VENV_DIR:-${HOME}/Library/Caches/ListenKit/venvs/cpython-314}"
 python_executable="$venv_dir/bin/python"
 requirements_file="$repo_root/requirements-faster-whisper.txt"
 import_timeout_seconds="${LISTENKIT_FASTER_WHISPER_IMPORT_TIMEOUT_SECONDS:-60}"
 
 if [[ ! "$import_timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
   echo "LISTENKIT_FASTER_WHISPER_IMPORT_TIMEOUT_SECONDS must be a positive integer." >&2
+  exit 1
+fi
+
+if [[ "$venv_dir" == *"/Library/Mobile Documents/"* ]]; then
+  echo "Refusing to create ListenKit's native runtime in an iCloud-backed path: $venv_dir" >&2
+  echo "Use the default local Cache path or set LISTENKIT_FASTER_WHISPER_VENV_DIR outside iCloud." >&2
   exit 1
 fi
 
@@ -107,9 +113,9 @@ if [[ -x "$python_executable" ]] && ! python_version_is_supported "$python_execu
   "$python_executable" - <<'PY' >&2
 import sys
 print(
-    "Existing ListenKit .venv uses unsupported Python "
+    "Existing ListenKit runtime uses unsupported Python "
     f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}. "
-    "Rebuild ListenKit/.venv with Homebrew Python 3.14."
+    "Rebuild it with Homebrew Python 3.14."
 )
 PY
   exit 1
@@ -134,6 +140,7 @@ if [[ ! -x "$python_executable" ]]; then
     echo "Python 3.14 is required to create ListenKit's faster-whisper environment. Set LISTENKIT_FASTER_WHISPER_BOOTSTRAP_PYTHON=/opt/homebrew/bin/python3.14." >&2
     exit 1
   fi
+  mkdir -p "$(dirname "$venv_dir")"
   "$bootstrap_python" -m venv "$venv_dir"
 fi
 

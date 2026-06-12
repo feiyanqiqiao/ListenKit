@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INIT_SCRIPT = REPO_ROOT / "cli" / "init-faster-whisper.sh"
+CHECK_RUNTIME = REPO_ROOT / "cli" / "check-runtime.sh"
 REQUIREMENTS = REPO_ROOT / "requirements-faster-whisper.txt"
 PYTHON314 = Path("/opt/homebrew/bin/python3.14")
 
@@ -28,6 +29,16 @@ class InitFasterWhisperTests(unittest.TestCase):
         self.assertIn('-r "$requirements_file"', script)
         self.assertNotIn("pip install faster-whisper", script)
 
+    def test_default_runtime_is_local_cache_not_repo_venv(self) -> None:
+        init_script = INIT_SCRIPT.read_text(encoding="utf-8")
+        check_script = CHECK_RUNTIME.read_text(encoding="utf-8")
+
+        expected = '${HOME}/Library/Caches/ListenKit/venvs/cpython-314'
+        self.assertIn(expected, init_script)
+        self.assertIn(expected, check_script)
+        self.assertNotIn('$repo_root/.venv/bin/python', init_script)
+        self.assertNotIn('$repo_root/.venv/bin/python', check_script)
+
     def test_existing_python314_venv_is_supported(self) -> None:
         if not PYTHON314.is_file():
             self.skipTest("Homebrew Python 3.14 is not installed")
@@ -35,7 +46,8 @@ class InitFasterWhisperTests(unittest.TestCase):
             root = Path(tmpdir)
             repo = root / "ListenKit"
             script = repo / "cli" / "init-faster-whisper.sh"
-            venv_python = repo / ".venv" / "bin" / "python"
+            venv_dir = root / "runtime"
+            venv_python = venv_dir / "bin" / "python"
             script.parent.mkdir(parents=True)
             venv_python.parent.mkdir(parents=True)
             script.write_text(INIT_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
@@ -48,6 +60,7 @@ class InitFasterWhisperTests(unittest.TestCase):
             )
             venv_python.chmod(0o755)
             env = os.environ.copy()
+            env["LISTENKIT_FASTER_WHISPER_VENV_DIR"] = str(venv_dir)
 
             result = subprocess.run(
                 [str(script)],
@@ -68,7 +81,8 @@ class InitFasterWhisperTests(unittest.TestCase):
             root = Path(tmpdir)
             repo = root / "ListenKit"
             script = repo / "cli" / "init-faster-whisper.sh"
-            venv_python = repo / ".venv" / "bin" / "python"
+            venv_dir = root / "runtime"
+            venv_python = venv_dir / "bin" / "python"
             script.parent.mkdir(parents=True)
             venv_python.parent.mkdir(parents=True)
             script.write_text(INIT_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
@@ -83,6 +97,7 @@ class InitFasterWhisperTests(unittest.TestCase):
             )
             venv_python.chmod(0o755)
             env = os.environ.copy()
+            env["LISTENKIT_FASTER_WHISPER_VENV_DIR"] = str(venv_dir)
             env["LISTENKIT_FASTER_WHISPER_IMPORT_TIMEOUT_SECONDS"] = "1"
 
             result = subprocess.run(
@@ -97,6 +112,22 @@ class InitFasterWhisperTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("timed out after 1 seconds", result.stderr)
+
+    def test_init_refuses_icloud_runtime_target(self) -> None:
+        env = os.environ.copy()
+        env["LISTENKIT_FASTER_WHISPER_VENV_DIR"] = "/Users/test/Library/Mobile Documents/ListenKit/.venv"
+
+        result = subprocess.run(
+            [str(INIT_SCRIPT)],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("iCloud-backed", result.stderr)
 
 
 if __name__ == "__main__":
