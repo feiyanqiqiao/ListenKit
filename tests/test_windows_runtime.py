@@ -84,6 +84,7 @@ class WindowsRuntimeTests(unittest.TestCase):
                     check=True,
                     stdout=subprocess.PIPE,
                     text=True,
+                    encoding="utf-8",
                     env={**os.environ, "PYTHONUTF8": "1"},
                 ).stdout.strip()
             )
@@ -164,6 +165,7 @@ class WindowsRuntimeTests(unittest.TestCase):
                     check=True,
                     stdout=subprocess.PIPE,
                     text=True,
+                    encoding="utf-8",
                     env={**os.environ, "PYTHONUTF8": "1"},
                 ).stdout.strip()
             )
