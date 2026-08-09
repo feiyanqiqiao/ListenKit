@@ -9,7 +9,7 @@ Local-first multilingual audio and video transcription toolchain. ListenKit turn
 macOS/Linux/WSL:
 
 ```bash
-git clone https://github.com/jiezhengj/ListenKit.git
+git clone https://github.com/feiyanqiqiao/ListenKit.git
 cd ListenKit
 # macOS/Homebrew path. Linux users should install yt-dlp and ffmpeg with their package manager.
 brew install yt-dlp ffmpeg
@@ -63,8 +63,9 @@ If you do not know the target path yet, use the `--print` fallback described in 
 - `docs/backends.md`: ASR engine and acceleration policy
 - `docs/debugging.md`: lower-level maintenance and debugging interfaces
 - `docs/output-format.md`: transcript Markdown and JSON output shape
+- `cli/init-faster-whisper.sh`: managed ASR runtime initializer for macOS/Linux/WSL
 - `cli/check-runtime.sh`: read-only Python 3.14 and faster-whisper health check for Bash environments
-- `cli/init-faster-whisper.ps1`: native Windows faster-whisper runtime initializer
+- `cli/init-faster-whisper.ps1`: native Windows managed ASR runtime initializer
 - `cli/check-runtime.ps1`: native Windows runtime health check
 - `cli/generate-markdown.ps1`: native Windows public transcript entrypoint
 - `cli/doctor.ps1`: read-only Windows platform and dependency diagnosis

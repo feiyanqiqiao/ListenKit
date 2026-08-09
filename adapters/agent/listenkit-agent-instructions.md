@@ -36,6 +36,8 @@ Rules:
 - Provide exactly one input source: `--url` or `--input`.
 - Always provide `--language` and `--output`.
 - Use `--auto-init` unless the user explicitly chooses a different backend setup.
+- Leave `--engine` and `--device` on their automatic defaults; do not force CPU
+  unless the user requests reproducible CPU execution.
 - For `--output path/name.md`, expect both `path/name.md` and `path/name.json`.
 - If the user does not specify an output path, prefer `work/<safe-source-stem>-transcript.md`; if no stable source stem is available, use `work/transcript.md`.
 

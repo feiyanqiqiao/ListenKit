@@ -63,9 +63,11 @@ For local media, replace `--url <url>` with `--input <path>`.
 ListenKit owns source acquisition, subtitle selection, ASR fallback, transcript normalization, and plain transcript rendering behind this entrypoint. External agents should not reimplement or bypass those stages.
 
 Automatic ASR is acceleration-first: Apple Silicon uses a prepared MLX/Metal
-runtime, while Windows/Linux NVIDIA systems use managed CUDA. Agents should not
-force CPU unless the user requests reproducible CPU execution. Initialization
-or `--auto-init` may download native dependencies and the selected local model.
+runtime, while Windows/Linux NVIDIA systems use managed CUDA. Agents should
+leave the engine and device on `auto` and should not force CPU unless the user
+requests reproducible CPU execution. `--auto-init` authorizes creation or repair
+of a missing core runtime. Initialization and managed-runtime transcription may
+download platform acceleration dependencies and the selected local model.
 
 For URL input, the Markdown title defaults to the video's platform title when available. For local input, the title defaults to the source filename. Use `--title` only when the caller needs an explicit override.
 

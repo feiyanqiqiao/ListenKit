@@ -22,6 +22,7 @@ For URL input, the wrapper tries platform subtitles first. If subtitles are usab
 ## Rules
 
 - Keep ListenKit output to transcript Markdown and the same-stem transcript JSON artifact.
+- Leave ASR engine and device selection on their automatic defaults; do not force CPU unless the user explicitly requests reproducible CPU execution.
 - Do not expose existing-audio, existing-transcript-JSON, subtitle extraction, ASR, import, rendering, raw downloader, or `tools/*` workflows through this high-level skill; those belong to ListenKit debugging and maintenance only.
 - Do not add learning-note templates, Obsidian frontmatter, wikilinks, Anki cards, or review scheduling unless a downstream project explicitly asks.
 - Keep language-learning analysis outside this generic transcription skill.

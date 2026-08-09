@@ -44,10 +44,11 @@ The default ASR engine is `auto`:
 cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP --auto-init
 ```
 
-`--auto-init` authorizes ListenKit to create the local Cache runtime and install
-`faster-whisper`. It also prepares MLX/Metal on Apple Silicon, or managed CUDA
-when an NVIDIA GPU is detected on Windows or Linux, before transcription. For a
-one-time manual setup, run this script from anywhere:
+`--auto-init` authorizes ListenKit to create or repair the local Cache runtime
+and install `faster-whisper`. Once the managed runtime exists, transcription
+also verifies and, when needed, prepares MLX/Metal on Apple Silicon or managed
+CUDA on Windows/Linux NVIDIA before selecting a backend. For a one-time manual
+setup, run this script from anywhere:
 
 ```bash
 cli/init-faster-whisper.sh
@@ -128,8 +129,8 @@ devices are still attempted with a supported lower-memory compute type instead
 of being rejected from model name, age, or a static VRAM threshold.
 
 ListenKit never installs or changes the NVIDIA system driver. If the driver is
-present, the managed CUDA dependencies are prepared by `--auto-init` or the
-platform `init-faster-whisper` command. Set `LISTENKIT_CUDA_AUTO_PREPARE=0` only
+present, managed CUDA dependencies are prepared by the platform initializer or
+before managed-runtime transcription. Set `LISTENKIT_CUDA_AUTO_PREPARE=0` only
 to disable this behavior deliberately. `doctor` remains read-only and reports
 the driver, managed libraries, devices, compute types, memory, and automatic
 choice.

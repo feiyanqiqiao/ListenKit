@@ -9,7 +9,7 @@ ListenKit 是一个本地优先的多语言音视频转写工具链。它接收�
 macOS / Linux / WSL：
 
 ```bash
-git clone https://github.com/jiezhengj/ListenKit.git
+git clone https://github.com/feiyanqiqiao/ListenKit.git
 cd ListenKit
 # macOS 使用 Homebrew；Linux 请通过系统包管理器安装同名工具。
 brew install yt-dlp ffmpeg

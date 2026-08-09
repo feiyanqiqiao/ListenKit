@@ -14,6 +14,8 @@ cli/generate-markdown.sh \
 
 The high-level command also accepts `--input <path>` as the single input source. It derives the ASR locale from `--language`. URL titles default to the video's platform title when available; local titles default to the source filename unless optional overrides are provided.
 
+Leave ASR engine and device selection on their automatic defaults. Do not force CPU unless the user explicitly requests reproducible CPU execution.
+
 For `--output path/name.md`, consume `path/name.md` as the readable transcript and `path/name.json` as the structured transcript artifact.
 
 For URL input, the high-level command tries platform subtitles first and still attempts to import local audio. If subtitles are unavailable, it falls back to imported audio plus ASR.

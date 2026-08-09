@@ -12,6 +12,8 @@ Do not duplicate business logic inside editor rules.
 
 Select `.sh` for macOS/Linux/WSL and `.ps1` for native Windows; do not use WSL as a transparent wrapper for Windows paths.
 
+Leave ASR engine and device selection on their automatic defaults. Do not force CPU unless the user explicitly requests reproducible CPU execution.
+
 Expected Markdown output contains:
 
 - `Source`

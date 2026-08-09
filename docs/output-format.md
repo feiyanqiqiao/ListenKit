@@ -44,5 +44,8 @@ automatic CUDA execution falls back, `fallback_from` lists failed device/type
 attempts and `fallback_reason` records the bounded diagnostic.
 
 MLX Whisper payloads use `engine: "mlx-whisper"`, `device: "metal"`, device
-index `0`, and `compute_type: "float16"`. Rendered Markdown includes this actual
-execution metadata so a hardware fallback is visible in both output artifacts.
+index `0`, and `compute_type: "float16"`. Rendered Markdown includes actual
+engine, device, and compute metadata. If automatic MLX selection is unavailable,
+the resulting faster-whisper engine/device values make the executed fallback
+path visible; CUDA attempt failures additionally use `fallback_from` and
+`fallback_reason`.
