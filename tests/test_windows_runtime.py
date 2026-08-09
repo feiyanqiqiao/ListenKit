@@ -84,6 +84,7 @@ class WindowsRuntimeTests(unittest.TestCase):
                     check=True,
                     stdout=subprocess.PIPE,
                     text=True,
+                    env={**os.environ, "PYTHONUTF8": "1"},
                 ).stdout.strip()
             )
             (site_packages / "faster_whisper").mkdir()
@@ -163,6 +164,7 @@ class WindowsRuntimeTests(unittest.TestCase):
                     check=True,
                     stdout=subprocess.PIPE,
                     text=True,
+                    env={**os.environ, "PYTHONUTF8": "1"},
                 ).stdout.strip()
             )
             (site_packages / "faster_whisper").mkdir()

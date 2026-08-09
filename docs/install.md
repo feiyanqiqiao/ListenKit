@@ -31,26 +31,34 @@ On a typical Windows installation, the latter expands to `C:\Users\<username>\Ap
 
 The runtime is deliberately stored outside the repository and outside iCloud Drive. It contains large native libraries whose loading can stall while iCloud is hydrating or coordinating files. Do not place the runtime under `Library/Mobile Documents`.
 
-The optional Apple Speech backend requires macOS with Speech APIs and Xcode command line tools for the bundled Swift helper build.
+On Apple Silicon, the same managed environment also contains the pinned
+`mlx-whisper` package used for Metal GPU transcription. The optional Apple
+Speech backend requires macOS with Speech APIs and Xcode command line tools for
+the bundled Swift helper build.
 
-## faster-whisper Backend
+## Automatic Backend And Runtime
 
-The default ASR backend is `faster-whisper`:
+The default ASR engine is `auto`:
 
 ```bash
 cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP --auto-init
 ```
 
-`--auto-init` authorizes ListenKit to create the local Cache runtime, install
-`faster-whisper`, and, when an NVIDIA GPU is detected on Windows or Linux,
-prepare the managed CUDA runtime before continuing transcription. For a
+`--auto-init` authorizes ListenKit to create the local Cache runtime and install
+`faster-whisper`. It also prepares MLX/Metal on Apple Silicon, or managed CUDA
+when an NVIDIA GPU is detected on Windows or Linux, before transcription. For a
 one-time manual setup, run this script from anywhere:
 
 ```bash
 cli/init-faster-whisper.sh
 ```
 
-The initializer installs the direct dependency pinned in `requirements-faster-whisper.txt`. Transitive packages such as CTranslate2, ONNX Runtime, and PyAV are selected by faster-whisper's dependency constraints. The runtime snapshot under `docs/runtime-snapshot-python314.txt` is diagnostic evidence only and is not an installation lock file.
+The initializer installs the direct dependency pinned in
+`requirements-faster-whisper.txt`. On Apple Silicon it also installs the
+verified `requirements-mlx-whisper.txt` dependency set. Transitive packages
+such as CTranslate2, ONNX Runtime, PyAV, MLX, and mlx-metal are selected by those
+packages. The runtime snapshot under `docs/runtime-snapshot-python314.txt` is
+diagnostic evidence only and is not an installation lock file.
 
 Check an existing environment without changing it:
 
@@ -101,11 +109,13 @@ $env:FASTER_WHISPER_PYTHON = "D:\Python\faster-whisper\Scripts\python.exe"
 
 Default settings:
 
-- model: `small`
+- faster-whisper model: `small`
+- MLX Whisper model: `mlx-community/whisper-small-mlx`
 - beam size: `5`
+- Apple Silicon macOS: `mlx-whisper` + Metal GPU + float16
 - Windows/Linux NVIDIA: automatic CUDA preparation and compute-type selection
 - Windows/Linux without NVIDIA: optimized `cpu` + `int8`
-- macOS: CTranslate2 Apple Accelerate optimized CPU backend + `int8`
+- Intel macOS: CTranslate2 Apple Accelerate optimized CPU backend + `int8`
 
 On Windows and Linux, automatic selection first checks the NVIDIA driver and
 CTranslate2 device capabilities. Initialization installs `nvidia-cublas-cu12`
@@ -124,10 +134,26 @@ to disable this behavior deliberately. `doctor` remains read-only and reports
 the driver, managed libraries, devices, compute types, memory, and automatic
 choice.
 
-On macOS, this backend is named **Apple Accelerate**. It is an optimized CPU
-backend used automatically by the CTranslate2 wheel, not Metal/MPS GPU
-execution. The optional `--engine apple` backend uses Apple's Speech framework,
-whose hardware scheduling is controlled by macOS.
+### Apple Silicon MLX/Metal
+
+On an M-series Mac, automatic mode probes the managed MLX runtime and prepares
+it when needed. A successful probe selects `mlx-whisper` on the Metal GPU. The
+first transcription downloads `mlx-community/whisper-small-mlx`; later runs
+reuse the Hugging Face cache. Use `--engine mlx` to require this path and fail
+clearly if Metal is not ready. Set `LISTENKIT_MLX_MODEL` to another compatible
+MLX Whisper repository only when you intentionally want a different model.
+
+If automatic MLX preparation fails, ListenKit prints the reason and uses
+faster-whisper through CTranslate2's Apple Accelerate CPU backend. Set
+`LISTENKIT_MLX_AUTO_PREPARE=0` only to disable managed preparation deliberately.
+`doctor` is read-only: it reports Apple Silicon, MLX and Metal availability,
+versions, default device, model cache, and the engine that automatic mode would
+select.
+
+Intel Macs use **Apple Accelerate**, an optimized CPU backend. CTranslate2's
+prebuilt macOS wheel does not expose Metal/MPS GPU execution. The optional
+`--engine apple` backend uses Apple's Speech framework, whose hardware
+scheduling is controlled by macOS.
 
 Device controls:
 
@@ -144,8 +170,9 @@ Device controls:
 
 The same settings can be supplied with `LISTENKIT_ASR_DEVICE`,
 `LISTENKIT_ASR_COMPUTE_TYPE`, and `LISTENKIT_CUDA_DEVICE_INDEX`. Explicit CLI
-arguments take precedence. The first run may download the model and take
-significantly longer than later cached runs.
+arguments take precedence. These device and compute controls apply to
+faster-whisper; MLX always uses Metal. The first run may download the selected
+model and take significantly longer than later cached runs.
 
 Common faster-whisper failures:
 
@@ -160,6 +187,13 @@ Common faster-whisper failures:
   cuBLAS/cuDNN libraries are unavailable
 - every supported CUDA precision failed (for example due to actual OOM), after
   which automatic mode records the reason and uses CPU
+
+Common MLX failures:
+
+- the Mac is Intel rather than Apple Silicon
+- Metal is unavailable to the process
+- managed dependency or model download is blocked
+- MLX auto-preparation was deliberately disabled
 
 ## Apple Speech Backend
 

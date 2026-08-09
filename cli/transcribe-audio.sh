@@ -4,14 +4,14 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> [--engine faster-whisper|apple] [--output <json>] [--auto-init] [--device auto|cpu|cuda]
+  cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> [--engine auto|faster-whisper|mlx|apple] [--output <json>] [--auto-init] [--device auto|cpu|cuda]
 
 Options:
   --audio-path <path>      Local audio file to transcribe
   --locale <bcp47>         Speech locale, for example ja-JP or en-US
-  --engine <name>          ASR backend. Defaults to faster-whisper
+  --engine <name>          auto, faster-whisper, mlx, or apple. Defaults to auto
   --output <json>          Optional output JSON path
-  --auto-init              Allow ListenKit to create its local Cache runtime and install faster-whisper when missing
+  --auto-init              Allow ListenKit to create and prepare its managed local ASR runtime
   --device <name>          auto, cpu, or cuda. Defaults to auto
   --compute-type <name>    CTranslate2 compute type. Defaults to auto
   --device-index <index>   Preferred CUDA device index
@@ -21,7 +21,7 @@ EOF
 
 audio_path=""
 locale=""
-engine="faster-whisper"
+engine="auto"
 output_path=""
 auto_init="false"
 device="auto"
@@ -87,9 +87,9 @@ if [[ -z "$audio_path" || -z "$locale" ]]; then
   exit 1
 fi
 
-if [[ "$engine" != "faster-whisper" && "$engine" != "apple" ]]; then
+if [[ "$engine" != "auto" && "$engine" != "faster-whisper" && "$engine" != "mlx" && "$engine" != "apple" ]]; then
   echo "Unsupported engine: $engine" >&2
-  echo "Supported engines: faster-whisper, apple." >&2
+  echo "Supported engines: auto, faster-whisper, mlx, apple." >&2
   exit 1
 fi
 
@@ -338,6 +338,7 @@ core_command=(
   "$python_executable" -m listenkit_cli transcribe-audio
   --audio-path "$audio_path"
   --locale "$locale"
+  --engine "$engine"
   --device "$device"
   --compute-type "$compute_type"
 )

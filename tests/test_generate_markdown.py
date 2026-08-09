@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +18,9 @@ class GenerateMarkdownTests(unittest.TestCase):
             "#!/usr/bin/env bash\n"
             "if [[ \"$1\" == \"-c\" ]]; then\n"
             "  exit 0\n"
+            "fi\n"
+            "if [[ \"$1\" == \"-m\" && \"$2\" == \"listenkit_cli\" ]]; then\n"
+            "  exec \"$LISTENKIT_TEST_PYTHON\" \"$@\"\n"
             "fi\n"
             "exec /bin/sh \"$@\"\n",
             encoding="utf-8",
@@ -41,6 +45,7 @@ class GenerateMarkdownTests(unittest.TestCase):
         env = os.environ.copy()
         env["FASTER_WHISPER_PYTHON"] = str(fake_python)
         env["LISTENKIT_FASTER_WHISPER_HELPER"] = str(helper)
+        env["LISTENKIT_TEST_PYTHON"] = sys.executable
         return env
 
     def add_fake_url_tools(self, tmpdir: Path, env: dict[str, str], imported: Path) -> None:

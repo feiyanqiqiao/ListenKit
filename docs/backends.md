@@ -6,9 +6,11 @@ of calling backend commands directly.
 
 ## v1
 
-Two local ASR backends and one URL subtitle backend are supported:
+Three local ASR backends and one URL subtitle backend are supported:
 
-- `faster-whisper` is the default
+- `auto` is the default selector
+- `mlx` uses MLX Whisper and the Metal GPU on Apple Silicon
+- `faster-whisper` uses CTranslate2 on CUDA or optimized CPU
 - `apple` is optional and uses the bundled Apple Speech helper by default
 - `yt-dlp-subtitles` is used by the high-level URL workflow when platform subtitles are available
 
@@ -39,10 +41,18 @@ The runtime must not live under iCloud Drive (`Library/Mobile Documents`). It co
 
 Avoid documenting or using raw `python3 -m venv .venv` setup commands. They bypass the supported runtime path and health checks.
 
-Fixed faster-whisper model defaults:
+Fixed model defaults:
 
-- model: `small`
+- faster-whisper: `small`
+- MLX Whisper: `mlx-community/whisper-small-mlx`
 - beam size: `5`
+
+On Apple Silicon, `auto` first probes MLX and prepares the pinned
+`mlx-whisper` runtime when needed. Once Metal is ready, the MLX helper is chosen
+and reports `engine=mlx-whisper`, `device=metal`, and `compute_type=float16`.
+Explicit `--engine mlx` makes this a requirement instead of allowing a fallback.
+`LISTENKIT_MLX_AUTO_PREPARE=0` disables dependency preparation and
+`LISTENKIT_MLX_MODEL` overrides the compatible model repository.
 
 The Bash and native Windows entrypoints both use the Python core's
 `--device auto --compute-type auto` policy:
@@ -60,9 +70,10 @@ The Bash and native Windows entrypoints both use the Python core's
 
 The auto policy does not infer compatibility from a marketing model name alone.
 AMD and Intel GPUs remain on the optimized CPU path because CTranslate2's
-prebuilt GPU backend is CUDA-only. On macOS, CTranslate2 automatically uses its
-Apple Accelerate optimized CPU backend; its prebuilt macOS wheel does not expose
-a Metal/MPS GPU backend.
+prebuilt GPU backend is CUDA-only. Intel Macs, and Apple Silicon automatic mode
+after a reported MLX preparation failure, use CTranslate2's Apple Accelerate
+optimized CPU backend. The CTranslate2 macOS wheel itself does not expose a
+Metal/MPS GPU backend; Apple Silicon GPU execution is provided by MLX.
 
 Explicit `--device cuda` never silently falls back to CPU. It fails with the
 CUDA diagnostic after any lower-memory CUDA retry. `--device cpu` always avoids

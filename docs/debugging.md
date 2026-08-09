@@ -29,7 +29,7 @@ pipeline debugging:
 - `cli/transcribe-audio.sh`: local audio file -> transcript JSON
 - `cli/render-listening-note.py`: transcript JSON -> transcript Markdown
 
-Native Windows provides matching `.ps1` commands for import, subtitle extraction, transcription, and the public workflow. `.\cli\doctor.ps1` reports resolved dependencies, NVIDIA driver visibility, managed CUDA libraries, selected accelerator, and runtime health without changing the system. CUDA preparation is performed only by initialization/auto-init, never by `doctor`.
+Native Windows provides matching `.ps1` commands for import, subtitle extraction, transcription, and the public workflow. The platform `doctor` command reports resolved dependencies and runtime health without changing the system. Windows/Linux diagnostics include NVIDIA driver, managed CUDA libraries, devices and selected compute type; macOS diagnostics include architecture, MLX/Metal availability, versions, model cache and automatic engine. CUDA or MLX preparation is performed by initialization or before managed-runtime transcription, never by `doctor`.
 
 Use them only when investigating a specific stage or maintaining ListenKit.
 
@@ -39,6 +39,7 @@ Backend helpers under `tools/` are implementation details:
 
 - `tools/subtitles/vtt_to_transcript_json.py`
 - `tools/faster-whisper/transcribe.py`
+- `tools/mlx-whisper/transcribe.py`
 - `tools/apple-speech-helper/`
 
 Do not call these from external agent workflows. They are wrapped by the CLI

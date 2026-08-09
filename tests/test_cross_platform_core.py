@@ -24,6 +24,7 @@ from listenkit_cli.errors import ListenKitError, RuntimeHealthError
 from listenkit_cli.health import can_import_faster_whisper, import_timeout_seconds
 from listenkit_cli.errors import RuntimeImportTimeout
 from listenkit_cli.media import import_audio, validate_base_name
+from listenkit_cli.mlx_runtime import MlxDependencyInstall, MlxProbe
 from listenkit_cli.platform_paths import (
     default_runtime_dir,
     huggingface_hub_cache_dir,
@@ -237,11 +238,42 @@ class AccelerationPreparationTests(unittest.TestCase):
 
     def test_macos_reports_apple_accelerate_not_gpu(self) -> None:
         acceleration = prepare_runtime_acceleration(
-            Path("runtime-python"), platform="darwin", environment={}
+            Path("runtime-python"),
+            platform="darwin",
+            machine="x86_64",
+            environment={},
         )
         self.assertEqual(acceleration.backend, "apple-accelerate")
         self.assertTrue(acceleration.ready)
         self.assertIn("Metal/MPS", acceleration.message)
+
+    def test_apple_silicon_installs_mlx_then_reprobes_metal(self) -> None:
+        missing = MlxProbe(False, error="mlx-whisper is not installed")
+        ready = MlxProbe(
+            True,
+            metal_available=True,
+            mlx_version="0.32.0",
+            mlx_whisper_version="0.4.3",
+            default_device="gpu",
+        )
+        installation = MlxDependencyInstall(True, True, "installed")
+        with mock.patch(
+            "listenkit_cli.runtime.probe_mlx_runtime", side_effect=[missing, ready]
+        ) as probe, mock.patch(
+            "listenkit_cli.runtime.install_managed_mlx_dependencies",
+            return_value=installation,
+        ) as installer:
+            acceleration = prepare_runtime_acceleration(
+                Path("runtime-python"),
+                platform="darwin",
+                machine="arm64",
+                environment={},
+            )
+        self.assertTrue(acceleration.ready)
+        self.assertEqual(acceleration.backend, "mlx-metal")
+        self.assertTrue(acceleration.preparation_attempted)
+        self.assertEqual(probe.call_count, 2)
+        installer.assert_called_once()
 
 
 class AsrDevicePolicyTests(unittest.TestCase):
@@ -494,11 +526,14 @@ class AsrDevicePolicyTests(unittest.TestCase):
             ), mock.patch(
                 "listenkit_cli.transcription.probe_cuda_devices", return_value=probe
             ), mock.patch(
+                "listenkit_cli.transcription.prepare_runtime_acceleration"
+            ), mock.patch(
                 "listenkit_cli.transcription.run_command", side_effect=[failure, success]
             ) as runner:
                 rendered = transcribe_audio(
                     audio_path=audio,
                     locale="en-US",
+                    engine="faster-whisper",
                     device="auto",
                     environment={
                         **os.environ,
@@ -516,6 +551,109 @@ class AsrDevicePolicyTests(unittest.TestCase):
             self.assertEqual(
                 second_args[second_args.index("--compute-type") + 1], "int8_float16"
             )
+
+    def test_auto_transcription_prefers_ready_mlx_on_apple_silicon(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio = root / "输入.wav"
+            audio.write_bytes(b"audio")
+            helper = root / "mlx-helper.py"
+            helper.write_text("# fake", encoding="utf-8")
+            success = mock.Mock(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "schema_version": 1,
+                        "engine": "mlx-whisper",
+                        "model": "mlx-community/whisper-small-mlx",
+                        "locale": "zh-CN",
+                        "full_text": "Metal 正常",
+                        "segments": [],
+                        "timing_complete": True,
+                    }
+                ),
+                stderr="",
+            )
+            ready = MlxProbe(
+                True,
+                metal_available=True,
+                mlx_version="0.32.0",
+                mlx_whisper_version="0.4.3",
+                default_device="gpu",
+            )
+            with mock.patch(
+                "listenkit_cli.transcription._managed_runtime_python",
+                return_value=Path(sys.executable),
+            ), mock.patch(
+                "listenkit_cli.transcription.can_import_faster_whisper", return_value=True
+            ), mock.patch(
+                "listenkit_cli.transcription.prepare_runtime_acceleration"
+            ) as prepare, mock.patch(
+                "listenkit_cli.transcription.is_apple_silicon", return_value=True
+            ), mock.patch(
+                "listenkit_cli.transcription.probe_mlx_runtime", return_value=ready
+            ), mock.patch(
+                "listenkit_cli.transcription.run_command", return_value=success
+            ) as runner:
+                rendered = transcribe_audio(
+                    audio_path=audio,
+                    locale="zh-CN",
+                    environment={
+                        **os.environ,
+                        "LISTENKIT_MLX_WHISPER_HELPER": str(helper),
+                    },
+                )
+            payload = json.loads(rendered)
+            self.assertEqual(payload["engine"], "mlx-whisper")
+            self.assertEqual(payload["device"], "metal")
+            self.assertEqual(payload["compute_type"], "float16")
+            prepare.assert_called_once()
+            self.assertEqual(runner.call_args.args[0][1], helper)
+
+    def test_managed_runtime_prepares_acceleration_before_cpu_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio = root / "audio.wav"
+            audio.write_bytes(b"audio")
+            helper = root / "helper.py"
+            helper.write_text("# fake", encoding="utf-8")
+            success = mock.Mock(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "schema_version": 1,
+                        "engine": "faster-whisper",
+                        "locale": "en-US",
+                        "full_text": "ok",
+                        "segments": [],
+                        "timing_complete": True,
+                    }
+                ),
+                stderr="",
+            )
+            with mock.patch(
+                "listenkit_cli.transcription._managed_runtime_python",
+                return_value=Path(sys.executable),
+            ), mock.patch(
+                "listenkit_cli.transcription.can_import_faster_whisper", return_value=True
+            ), mock.patch(
+                "listenkit_cli.transcription.prepare_runtime_acceleration"
+            ) as prepare, mock.patch(
+                "listenkit_cli.transcription.probe_cuda_devices",
+                return_value=CudaProbe(()),
+            ), mock.patch(
+                "listenkit_cli.transcription.run_command", return_value=success
+            ):
+                transcribe_audio(
+                    audio_path=audio,
+                    locale="en-US",
+                    engine="faster-whisper",
+                    environment={
+                        **os.environ,
+                        "LISTENKIT_FASTER_WHISPER_HELPER": str(helper),
+                    },
+                )
+            prepare.assert_called_once()
 
     def test_auto_transcription_falls_back_to_cpu_after_cuda_retries(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -568,12 +706,15 @@ class AsrDevicePolicyTests(unittest.TestCase):
             ), mock.patch(
                 "listenkit_cli.transcription.probe_cuda_devices", return_value=probe
             ), mock.patch(
+                "listenkit_cli.transcription.prepare_runtime_acceleration"
+            ), mock.patch(
                 "listenkit_cli.transcription.run_command",
                 side_effect=[cuda_failure, cuda_failure, cpu_success],
             ) as runner:
                 rendered = transcribe_audio(
                     audio_path=audio,
                     locale="en-US",
+                    engine="faster-whisper",
                     device="auto",
                     environment={
                         **os.environ,

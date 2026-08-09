@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Mapping
@@ -17,6 +18,7 @@ from .asr_device import (
 from .cuda_runtime import cuda_runtime_environment
 from .errors import ListenKitError, RuntimeHealthError
 from .health import can_import_faster_whisper
+from .mlx_runtime import is_apple_silicon, probe_mlx_runtime
 from .platform_paths import (
     huggingface_hub_cache_dir,
     platform_id,
@@ -78,7 +80,7 @@ def transcribe_audio(
     *,
     audio_path: Path,
     locale: str,
-    engine: str = "faster-whisper",
+    engine: str = "auto",
     output: Path | None = None,
     auto_init: bool = False,
     device: str | None = None,
@@ -89,9 +91,13 @@ def transcribe_audio(
     env = dict(os.environ if environment is None else environment)
     if not audio_path.is_file():
         raise ListenKitError(f"Audio file not found: {audio_path}")
-    if engine not in {"faster-whisper", "apple"}:
-        raise ListenKitError(f"Unsupported engine: {engine}")
-    if engine == "apple":
+    requested_engine = engine or env.get("LISTENKIT_ASR_ENGINE", "auto")
+    if requested_engine not in {"auto", "faster-whisper", "mlx", "apple"}:
+        raise ListenKitError(
+            f"Unsupported engine: {requested_engine}. Supported engines: "
+            "auto, faster-whisper, mlx, apple."
+        )
+    if requested_engine == "apple":
         if platform_id() == "windows":
             raise ListenKitError("The Apple Speech backend is available only on macOS.")
         helper = Path(
@@ -107,9 +113,6 @@ def transcribe_audio(
         requested_device = device or env.get("LISTENKIT_ASR_DEVICE", "auto")
         requested_compute_type = compute_type or env.get(
             "LISTENKIT_ASR_COMPUTE_TYPE", "auto"
-        )
-        acceleration_preparation_authorized = (
-            auto_init or env.get("LISTENKIT_AUTO_INIT") == "1"
         )
         explicit = env.get("FASTER_WHISPER_PYTHON")
         python_executable = Path(explicit) if explicit else _managed_runtime_python(env)
@@ -132,99 +135,151 @@ def transcribe_audio(
             python_executable = initialize_runtime(
                 environment=env,
                 require_cuda=requested_device == "cuda",
+                prefer_mlx=requested_engine in {"auto", "mlx"},
+                require_mlx=requested_engine == "mlx",
             )
-        elif (
-            not explicit
-            and requested_device != "cpu"
-            and acceleration_preparation_authorized
-        ):
+        elif not explicit and requested_device != "cpu":
             prepare_runtime_acceleration(
                 python_executable,
                 environment=env,
                 require_cuda=requested_device == "cuda",
+                prefer_mlx=requested_engine in {"auto", "mlx"},
+                require_mlx=requested_engine == "mlx",
             )
 
-        env = cuda_runtime_environment(python_executable, environment=env)
-
-        helper = Path(
-            env.get(
-                "LISTENKIT_FASTER_WHISPER_HELPER",
-                str(repository_root() / "tools" / "faster-whisper" / "transcribe.py"),
-            )
-        )
-        if not helper.is_file():
-            raise ListenKitError(f"faster-whisper helper is not installed at: {helper}")
-        if _model_is_cached("small", env):
-            env.setdefault("HF_HUB_OFFLINE", "1")
-            env.setdefault("TRANSFORMERS_OFFLINE", "1")
-
-        selected_index = _selected_device_index(device_index, env)
-        probe = (
-            CudaProbe(())
-            if requested_device == "cpu"
-            else probe_cuda_devices(python_executable, environment=env)
-        )
-        selection = select_asr_device(
-            probe,
+        resolved_engine = _resolve_engine(
+            requested_engine,
+            python_executable=python_executable,
             requested_device=requested_device,
-            requested_compute_type=requested_compute_type,
-            requested_device_index=selected_index,
+            environment=env,
         )
-        attempts = _device_attempts(
-            selection,
-            requested_device=requested_device,
-            requested_compute_type=requested_compute_type,
-        )
-        attempted_labels: list[str] = []
-        fallback_reason: str | None = None
-        result = None
-        payload = None
-        for current in attempts:
-            result = _run_faster_whisper_helper(
+        if resolved_engine == "mlx":
+            if requested_device not in {"auto", ""} or requested_compute_type not in {
+                "auto",
+                "",
+            }:
+                raise ListenKitError(
+                    "--device and --compute-type are faster-whisper controls; "
+                    "MLX always uses the Apple Silicon Metal GPU."
+                )
+            result = _run_mlx_whisper_helper(
                 python_executable=python_executable,
-                helper=helper,
                 audio_path=audio_path,
                 locale=locale,
-                selection=current,
                 environment=env,
             )
             stdout = result.stdout or ""
             try:
                 payload = _validate_payload(stdout)
-                if result.returncode != 0:
-                    raise ListenKitError(
-                        (result.stderr or "").strip()
-                        or f"ASR backend failed with exit {result.returncode}"
-                    )
-            except ListenKitError as exc:
-                combined = "\n".join(
-                    value for value in ((result.stderr or "").strip(), stdout.strip(), str(exc)) if value
-                )
-                if current.device == "cuda" and is_cuda_runtime_failure(combined):
-                    attempted_labels.append(current.label)
-                    fallback_reason = _one_line_error(combined)
-                    continue
+            except ListenKitError:
                 if result.stderr:
                     raise ListenKitError(f"{result.stderr.strip()}\n{stdout.strip()}")
                 raise
-
-            payload["device"] = current.device
-            payload["device_index"] = current.device_index
-            payload["compute_type"] = current.compute_type
-            payload["device_selection_reason"] = current.reason
-            if current.device_name:
-                payload["device_name"] = current.device_name
-            if attempted_labels:
-                payload["fallback_from"] = attempted_labels
-                payload["fallback_reason"] = fallback_reason
-            stdout = json.dumps(payload, ensure_ascii=False)
-            break
-        else:
-            raise ListenKitError(
-                fallback_reason or "All configured faster-whisper device attempts failed."
+            if result.returncode != 0:
+                raise ListenKitError(
+                    (result.stderr or "").strip()
+                    or f"MLX ASR backend failed with exit {result.returncode}"
+                )
+            payload["device"] = "metal"
+            payload["device_index"] = 0
+            payload["compute_type"] = payload.get("compute_type", "float16")
+            payload["device_selection_reason"] = (
+                "Apple Silicon with a ready MLX/Metal runtime"
             )
+            stdout = json.dumps(payload, ensure_ascii=False)
+        else:
+            env = cuda_runtime_environment(python_executable, environment=env)
 
-    if engine == "apple":
+            helper = Path(
+                env.get(
+                    "LISTENKIT_FASTER_WHISPER_HELPER",
+                    str(repository_root() / "tools" / "faster-whisper" / "transcribe.py"),
+                )
+            )
+            if not helper.is_file():
+                raise ListenKitError(f"faster-whisper helper is not installed at: {helper}")
+            if _model_is_cached("small", env):
+                env.setdefault("HF_HUB_OFFLINE", "1")
+                env.setdefault("TRANSFORMERS_OFFLINE", "1")
+
+            selected_index = _selected_device_index(device_index, env)
+            probe = (
+                CudaProbe(())
+                if requested_device == "cpu"
+                else probe_cuda_devices(python_executable, environment=env)
+            )
+            selection = select_asr_device(
+                probe,
+                requested_device=requested_device,
+                requested_compute_type=requested_compute_type,
+                requested_device_index=selected_index,
+            )
+            attempts = _device_attempts(
+                selection,
+                requested_device=requested_device,
+                requested_compute_type=requested_compute_type,
+            )
+            attempted_labels: list[str] = []
+            fallback_reason: str | None = None
+            result = None
+            payload = None
+            for current in attempts:
+                result = _run_faster_whisper_helper(
+                    python_executable=python_executable,
+                    helper=helper,
+                    audio_path=audio_path,
+                    locale=locale,
+                    selection=current,
+                    environment=env,
+                )
+                stdout = result.stdout or ""
+                try:
+                    payload = _validate_payload(stdout)
+                    if result.returncode != 0:
+                        raise ListenKitError(
+                            (result.stderr or "").strip()
+                            or f"ASR backend failed with exit {result.returncode}"
+                        )
+                except ListenKitError as exc:
+                    combined = "\n".join(
+                        value
+                        for value in (
+                            (result.stderr or "").strip(),
+                            stdout.strip(),
+                            str(exc),
+                        )
+                        if value
+                    )
+                    if current.device == "cuda" and is_cuda_runtime_failure(combined):
+                        attempted_labels.append(current.label)
+                        fallback_reason = _one_line_error(combined)
+                        continue
+                    if result.stderr:
+                        raise ListenKitError(f"{result.stderr.strip()}\n{stdout.strip()}")
+                    raise
+
+                payload["device"] = current.device
+                payload["device_index"] = current.device_index
+                payload["compute_type"] = current.compute_type
+                payload["device_selection_reason"] = current.reason
+                if current.device_name:
+                    payload["device_name"] = current.device_name
+                if attempted_labels:
+                    payload["fallback_from"] = attempted_labels
+                    payload["fallback_reason"] = fallback_reason
+                    print(
+                        "ListenKit warning: CUDA attempts failed; using CPU INT8. "
+                        f"Reason: {fallback_reason}",
+                        file=sys.stderr,
+                    )
+                stdout = json.dumps(payload, ensure_ascii=False)
+                break
+            else:
+                raise ListenKitError(
+                    fallback_reason or "All configured faster-whisper device attempts failed."
+                )
+
+    if requested_engine == "apple":
         stdout = result.stdout or ""
         try:
             _validate_payload(stdout)
@@ -319,6 +374,66 @@ def _run_faster_whisper_helper(
             selection.compute_type,
             "--beam-size",
             "5",
+        ],
+        environment=environment,
+        check=False,
+    )
+
+
+def _resolve_engine(
+    requested_engine: str,
+    *,
+    python_executable: Path,
+    requested_device: str,
+    environment: Mapping[str, str],
+) -> str:
+    if requested_engine == "faster-whisper":
+        return requested_engine
+    if requested_engine == "mlx":
+        if not is_apple_silicon():
+            raise ListenKitError("The MLX backend requires Apple Silicon macOS.")
+        probe = probe_mlx_runtime(python_executable, environment=environment)
+        if not probe.ready:
+            raise ListenKitError(
+                f"MLX was requested, but its Metal runtime is not ready: {probe.error or 'unknown error'}"
+            )
+        return requested_engine
+    if requested_engine == "auto":
+        if requested_device == "auto" and is_apple_silicon():
+            probe = probe_mlx_runtime(python_executable, environment=environment)
+            if probe.ready:
+                return "mlx"
+        return "faster-whisper"
+    raise ListenKitError(f"Unsupported engine: {requested_engine}")
+
+
+def _run_mlx_whisper_helper(
+    *,
+    python_executable: Path,
+    audio_path: Path,
+    locale: str,
+    environment: Mapping[str, str],
+):
+    helper = Path(
+        environment.get(
+            "LISTENKIT_MLX_WHISPER_HELPER",
+            str(repository_root() / "tools" / "mlx-whisper" / "transcribe.py"),
+        )
+    )
+    if not helper.is_file():
+        raise ListenKitError(f"MLX Whisper helper is not installed at: {helper}")
+    model = environment.get(
+        "LISTENKIT_MLX_MODEL", "mlx-community/whisper-small-mlx"
+    )
+    return run_command(
+        [
+            python_executable,
+            helper,
+            audio_path,
+            "--locale",
+            locale,
+            "--model",
+            model,
         ],
         environment=environment,
         check=False,

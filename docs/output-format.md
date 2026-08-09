@@ -12,7 +12,7 @@ Rendered transcript Markdown uses a fixed section contract:
 
 ## Section Rules
 
-- `Source`: source reference or audio filename, language, locale, transcript engine, timing status, generation time.
+- `Source`: source reference or audio filename, language, locale, transcript engine, actual ASR device and compute type when available, acceleration fallback reason when applicable, timing status, and generation time.
 - `Transcript`: ASR text, lightly cleaned for spacing and paragraph breaks.
 
 The format is plain Markdown. ListenKit does not add learning-analysis sections; downstream projects can transform the transcript into their own note format.
@@ -42,3 +42,7 @@ Faster-whisper payloads also report the selected `device`, `device_index`, and
 `compute_type`. `device_name` is included when NVIDIA metadata is available. If
 automatic CUDA execution falls back, `fallback_from` lists failed device/type
 attempts and `fallback_reason` records the bounded diagnostic.
+
+MLX Whisper payloads use `engine: "mlx-whisper"`, `device: "metal"`, device
+index `0`, and `compute_type: "float16"`. Rendered Markdown includes this actual
+execution metadata so a hardware fallback is visible in both output artifacts.

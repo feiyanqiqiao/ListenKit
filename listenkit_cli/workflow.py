@@ -82,7 +82,7 @@ def generate_markdown(
     input_path: Path | None = None,
     title: str | None = None,
     locale: str | None = None,
-    engine: str = "faster-whisper",
+    engine: str = "auto",
     device: str | None = None,
     compute_type: str | None = None,
     device_index: int | None = None,

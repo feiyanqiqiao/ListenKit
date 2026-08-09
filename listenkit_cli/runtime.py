@@ -12,6 +12,11 @@ from .asr_device import CudaProbe, probe_cuda_devices
 from .cuda_runtime import install_managed_cuda_dependencies, nvidia_driver_available
 from .errors import ListenKitError, RuntimeHealthError
 from .health import EXPECTED_FASTER_WHISPER, inspect_runtime, python_is_314
+from .mlx_runtime import (
+    install_managed_mlx_dependencies,
+    is_apple_silicon,
+    probe_mlx_runtime,
+)
 from .platform_paths import default_runtime_dir, platform_id, runtime_python_path
 
 
@@ -104,6 +109,8 @@ def initialize_runtime(
     environment: Mapping[str, str] | None = None,
     force_repair: bool = False,
     require_cuda: bool = False,
+    prefer_mlx: bool = True,
+    require_mlx: bool = False,
 ) -> Path:
     env = dict(os.environ if environment is None else environment)
     target_dir = runtime_dir or default_runtime_dir(platform=platform, environment=env)
@@ -161,6 +168,8 @@ def initialize_runtime(
         platform=platform,
         environment=env,
         require_cuda=require_cuda,
+        prefer_mlx=prefer_mlx,
+        require_mlx=require_mlx,
     )
     return executable
 
@@ -171,10 +180,62 @@ def prepare_runtime_acceleration(
     platform: str | None = None,
     environment: Mapping[str, str] | None = None,
     require_cuda: bool = False,
+    prefer_mlx: bool = True,
+    require_mlx: bool = False,
+    machine: str | None = None,
 ) -> RuntimeAcceleration:
     env = dict(os.environ if environment is None else environment)
     current_platform = platform_id(platform)
     if current_platform == "macos":
+        if require_cuda:
+            raise ListenKitError("CUDA was requested, but CUDA is not available on macOS.")
+        if prefer_mlx and is_apple_silicon(platform=platform, machine=machine):
+            initial_probe = probe_mlx_runtime(executable, environment=env)
+            if initial_probe.ready:
+                return RuntimeAcceleration(
+                    backend="mlx-metal",
+                    ready=True,
+                    preparation_attempted=False,
+                    message="MLX can access the Apple Silicon Metal GPU",
+                )
+            installation = install_managed_mlx_dependencies(
+                executable,
+                environment=env,
+                platform=platform,
+                machine=machine,
+            )
+            final_probe = (
+                probe_mlx_runtime(executable, environment=env)
+                if installation.succeeded
+                else initial_probe
+            )
+            if final_probe.ready:
+                return RuntimeAcceleration(
+                    backend="mlx-metal",
+                    ready=True,
+                    preparation_attempted=installation.attempted,
+                    message="Managed MLX/Metal runtime is ready",
+                )
+            detail = (
+                final_probe.error
+                or installation.message
+                or "MLX probe could not access Metal"
+            )
+            if require_mlx:
+                raise ListenKitError(f"MLX/Metal preparation failed: {detail}")
+            print(
+                "ListenKit warning: Apple Silicon detected, but MLX/Metal "
+                f"preparation did not complete: {detail}",
+                file=sys.stderr,
+            )
+            return RuntimeAcceleration(
+                backend="apple-accelerate",
+                ready=True,
+                preparation_attempted=installation.attempted,
+                message=f"MLX unavailable; using Apple Accelerate CPU backend: {detail}",
+            )
+        if require_mlx:
+            raise ListenKitError("MLX was requested, but this Mac is not Apple Silicon.")
         return RuntimeAcceleration(
             backend="apple-accelerate",
             ready=True,

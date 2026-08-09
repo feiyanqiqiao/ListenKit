@@ -2,12 +2,14 @@
 
 Local-first multilingual audio and video transcription toolchain. ListenKit turns URL or local media input into plain transcript Markdown plus same-stem transcript JSON.
 
+[简体中文](README.zh-CN.md) | English
+
 ## Quick Try
 
 macOS/Linux/WSL:
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/jiezhengj/ListenKit.git
 cd ListenKit
 # macOS/Homebrew path. Linux users should install yt-dlp and ffmpeg with their package manager.
 brew install yt-dlp ffmpeg
@@ -27,14 +29,13 @@ winget install Gyan.FFmpeg
 
 The Windows workflow is native: it does not require Bash, WSL, Git Bash, or MSYS2. If script execution is restricted, run the same entrypoint with `powershell -ExecutionPolicy Bypass -File .\cli\generate-markdown.ps1 ...`.
 
-ASR defaults to acceleration-first device selection. On Windows and Linux,
-initialization detects an NVIDIA GPU, installs CUDA 12 cuBLAS and cuDNN 9 into
-ListenKit's isolated runtime, and uses the compute types CTranslate2 reports as
-supported. A failed CUDA attempt retries a lower-memory CUDA precision before
-falling back to CPU INT8. macOS uses CTranslate2's Apple Accelerate optimized
-CPU backend; the current CTranslate2 macOS wheel has no Metal/MPS GPU backend.
-Use `--device cpu` for reproducible CPU-only execution or `--device cuda` to
-require CUDA without silent CPU fallback.
+ASR defaults to acceleration-first execution. On Apple Silicon macOS, ListenKit
+prepares MLX Whisper and selects the Metal GPU. On Windows and Linux, it detects
+an NVIDIA GPU, prepares CUDA 12 cuBLAS and cuDNN 9 inside ListenKit's isolated
+runtime, and tries supported CUDA precisions before a visible CPU INT8 fallback.
+Intel Macs use CTranslate2's Apple Accelerate CPU backend. Use `--device cpu`
+for reproducible CPU-only execution, `--device cuda` to require CUDA without CPU
+fallback, or `--engine mlx` to require MLX/Metal on Apple Silicon.
 
 This writes:
 
@@ -59,6 +60,7 @@ If you do not know the target path yet, use the `--print` fallback described in 
 
 - `LLM_INTEGRATION.md`: AI/agent install and usage contract
 - `docs/install.md`: dependencies, backend setup, and troubleshooting
+- `docs/backends.md`: ASR engine and acceleration policy
 - `docs/debugging.md`: lower-level maintenance and debugging interfaces
 - `docs/output-format.md`: transcript Markdown and JSON output shape
 - `cli/check-runtime.sh`: read-only Python 3.14 and faster-whisper health check for Bash environments
@@ -107,6 +109,10 @@ On Windows, adapters use `.\cli\generate-markdown.ps1` instead. Both entrypoints
 
 ## Privacy and Copyright
 
-The default transcription route uses local `faster-whisper`; the first run may download model files. Apple Speech is available as an optional local macOS backend. Downstream tools that consume transcript text may send it to the model provider you use. Only process material you have the right to use.
+The default transcription route is local: MLX Whisper on a ready Apple Silicon
+Mac and faster-whisper elsewhere. The first run may download model files. Apple
+Speech is available as an optional local macOS backend. Downstream tools that
+consume transcript text may send it to the model provider you use. Only process
+material you have the right to use.
 
 See `PRIVACY_AND_COPYRIGHT.md`.

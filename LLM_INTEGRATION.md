@@ -62,6 +62,11 @@ For local media, replace `--url <url>` with `--input <path>`.
 
 ListenKit owns source acquisition, subtitle selection, ASR fallback, transcript normalization, and plain transcript rendering behind this entrypoint. External agents should not reimplement or bypass those stages.
 
+Automatic ASR is acceleration-first: Apple Silicon uses a prepared MLX/Metal
+runtime, while Windows/Linux NVIDIA systems use managed CUDA. Agents should not
+force CPU unless the user requests reproducible CPU execution. Initialization
+or `--auto-init` may download native dependencies and the selected local model.
+
 For URL input, the Markdown title defaults to the video's platform title when available. For local input, the title defaults to the source filename. Use `--title` only when the caller needs an explicit override.
 
 ## Output Contract
@@ -75,7 +80,7 @@ work/sample-transcript.md
 The platform public entrypoint produces:
 
 - `work/sample-transcript.md`: human-readable transcript Markdown
-- `work/sample-transcript.json`: structured transcript JSON with normalized text, segments, source engine metadata, locale, and timing status
+- `work/sample-transcript.json`: structured transcript JSON with normalized text, segments, source engine and actual device metadata, fallback diagnostics, locale, and timing status
 
 Downstream agents may consume either artifact:
 

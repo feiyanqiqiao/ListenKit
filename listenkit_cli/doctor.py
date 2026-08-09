@@ -8,6 +8,7 @@ from typing import Mapping
 from .asr_device import probe_cuda_devices, select_asr_device
 from .cuda_runtime import nvidia_driver_available
 from .health import RuntimeHealthError, inspect_runtime
+from .mlx_runtime import is_apple_silicon, probe_mlx_runtime
 from .platform_paths import (
     default_runtime_dir,
     huggingface_hub_cache_dir,
@@ -27,8 +28,19 @@ def doctor_lines(environment: Mapping[str, str] | None = None) -> list[str]:
     model_ready = model_snapshots.is_dir() and any(
         path.is_file() for path in model_snapshots.glob("*/model.bin")
     )
+    mlx_model_snapshots = (
+        hub_cache / "models--mlx-community--whisper-small-mlx" / "snapshots"
+    )
+    mlx_model_ready = mlx_model_snapshots.is_dir() and any(
+        path.is_file()
+        for path in mlx_model_snapshots.glob("*/weights.*")
+    )
+    apple_silicon = is_apple_silicon(
+        platform=current_platform, machine=platform.machine()
+    )
     lines = [
         f"platform={current_platform}",
+        f"architecture={platform.machine()}",
         f"os_version={platform.platform()}",
         f"runtime_dir={runtime_dir}",
         f"runtime_python={runtime_python}",
@@ -38,13 +50,17 @@ def doctor_lines(environment: Mapping[str, str] | None = None) -> list[str]:
         f"powershell_version={env.get('LISTENKIT_POWERSHELL_VERSION', 'not-applicable')}",
         f"huggingface_hub_cache={hub_cache}",
         f"model_small_cache={'ready' if model_ready else 'missing'}",
+        f"model_mlx_small_cache={'ready' if mlx_model_ready else 'missing'}",
     ]
     if current_platform == "macos":
         lines.extend(
             [
-                "acceleration_backend=apple-accelerate",
-                "acceleration_kind=optimized-cpu",
-                "gpu_backend=unsupported-by-ctranslate2-macos-wheel",
+                f"apple_silicon={'yes' if apple_silicon else 'no'}",
+                "acceleration_backend=mlx-metal-or-apple-accelerate"
+                if apple_silicon
+                else "acceleration_backend=apple-accelerate",
+                "gpu_backend=mlx-metal" if apple_silicon else "gpu_backend=unavailable",
+                "cpu_backend=apple-accelerate",
             ]
         )
     elif current_platform in {"windows", "linux"}:
@@ -58,6 +74,21 @@ def doctor_lines(environment: Mapping[str, str] | None = None) -> list[str]:
         metadata = inspect_runtime(runtime_python, environment=env)
         lines.extend(metadata.as_lines())
         lines.append("import_health=ok")
+        if current_platform == "macos":
+            mlx_probe = probe_mlx_runtime(runtime_python, environment=env)
+            lines.extend(
+                [
+                    f"mlx_runtime={'ready' if mlx_probe.ready else 'unavailable'}",
+                    f"mlx_metal={'ready' if mlx_probe.metal_available else 'unavailable'}",
+                    f"mlx_version={mlx_probe.mlx_version or 'missing'}",
+                    f"mlx_whisper_version={mlx_probe.mlx_whisper_version or 'missing'}",
+                    f"mlx_default_device={mlx_probe.default_device or 'unknown'}",
+                    f"asr_auto_engine={'mlx' if mlx_probe.ready else 'faster-whisper'}",
+                ]
+            )
+            if mlx_probe.error:
+                lines.append(f"mlx_error={mlx_probe.error}")
+            return lines
         probe = probe_cuda_devices(runtime_python, environment=env)
         lines.append(f"cuda_device_count={len(probe.devices)}")
         if probe.error:

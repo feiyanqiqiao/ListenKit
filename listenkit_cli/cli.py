@@ -35,7 +35,11 @@ def build_parser() -> argparse.ArgumentParser:
     generate.add_argument("--output", type=Path, required=True)
     generate.add_argument("--title")
     generate.add_argument("--locale")
-    generate.add_argument("--engine", default="faster-whisper")
+    generate.add_argument(
+        "--engine",
+        default="auto",
+        choices=["auto", "faster-whisper", "mlx", "apple"],
+    )
     generate.add_argument("--device", choices=["auto", "cpu", "cuda"])
     generate.add_argument("--compute-type", choices=sorted(ALLOWED_COMPUTE_TYPES))
     generate.add_argument("--device-index", type=int)
@@ -67,7 +71,11 @@ def build_parser() -> argparse.ArgumentParser:
     transcribe = subparsers.add_parser("transcribe-audio", help="Transcribe one local audio file.")
     transcribe.add_argument("--audio-path", type=Path, required=True)
     transcribe.add_argument("--locale", required=True)
-    transcribe.add_argument("--engine", default="faster-whisper")
+    transcribe.add_argument(
+        "--engine",
+        default="auto",
+        choices=["auto", "faster-whisper", "mlx", "apple"],
+    )
     transcribe.add_argument("--device", choices=["auto", "cpu", "cuda"])
     transcribe.add_argument("--compute-type", choices=sorted(ALLOWED_COMPUTE_TYPES))
     transcribe.add_argument("--device-index", type=int)
@@ -81,7 +89,9 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--language", required=True)
     render.add_argument("--output", type=Path, required=True)
 
-    init_runtime = subparsers.add_parser("init-runtime", help="Create or repair the faster-whisper runtime.")
+    init_runtime = subparsers.add_parser(
+        "init-runtime", help="Create or repair the managed local ASR runtime."
+    )
     init_runtime.add_argument("--runtime-dir", type=Path)
     init_runtime.add_argument("--force-repair", action="store_true")
     init_runtime.add_argument("--print-runtime-dir", action="store_true")

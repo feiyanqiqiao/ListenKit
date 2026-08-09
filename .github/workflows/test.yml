@@ -46,3 +46,4 @@ jobs:
           .\cli\doctor.ps1
           & (Join-Path $env:LISTENKIT_FASTER_WHISPER_VENV_DIR "Scripts\python.exe") tools\faster-whisper\transcribe.py "$env:RUNNER_TEMP\missing.wav"
           if ($LASTEXITCODE -eq 0) { throw "Missing-audio helper check should fail with a schema error payload." }
+          exit 0

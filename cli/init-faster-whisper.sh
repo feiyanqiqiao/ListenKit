@@ -7,7 +7,8 @@ Usage:
   cli/init-faster-whisper.sh
 
 Create or reuse ListenKit's local Cache runtime, install faster-whisper,
-verify that it can be imported, and print the Python executable path.
+prepare supported CUDA or MLX acceleration, verify runtime health, and print
+the Python executable path.
 EOF
 }
 
