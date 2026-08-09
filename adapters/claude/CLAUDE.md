@@ -1,6 +1,6 @@
 # ListenKit
 
-Use the repository CLI. Do not reimplement the pipeline in prompt text.
+Use the repository CLI. Do not reimplement the pipeline in prompt text. Use `cli/generate-markdown.sh` on macOS/Linux/WSL and `.\cli\generate-markdown.ps1` on native Windows.
 
 Normal workflow:
 
@@ -21,3 +21,5 @@ For URL input, the high-level command tries platform subtitles first and still a
 Do not call lower-level import, subtitle extraction, ASR, rendering, raw downloader, or `tools/*` workflows in normal integrations. They are ListenKit debugging and maintenance interfaces only.
 
 Keep the output to transcript JSON or plain transcript Markdown. Do not add learning-note templates, Obsidian-only syntax, Anki cards, or review scheduling unless a downstream project explicitly requests that transformation.
+
+The Windows command accepts the same flags and produces the same output pair. Native Windows must not be routed through WSL because its runtime and paths are separate.

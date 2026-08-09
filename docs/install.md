@@ -1,6 +1,6 @@
 # Install
 
-This document covers system dependencies, backend initialization, and troubleshooting. Normal users and external agents should run `cli/generate-markdown.sh`; commands such as `cli/transcribe-audio.sh` are backend or debugging references, not the public agent entrypoint.
+This document covers system dependencies, backend initialization, and troubleshooting. Normal users and external agents should run `cli/generate-markdown.sh` on macOS/Linux/WSL or `.\cli\generate-markdown.ps1` on native Windows. Lower-level commands are backend or debugging references, not the public agent entrypoint.
 
 ## Dependencies
 
@@ -10,7 +10,24 @@ brew install yt-dlp ffmpeg
 
 Linux users should install equivalent `yt-dlp` and `ffmpeg` packages with their system package manager.
 
-Homebrew Python 3.14 is required for the faster-whisper runtime. Other lightweight maintenance scripts remain compatible with Python 3.10+, but the supported ASR environment is `~/Library/Caches/ListenKit/venvs/cpython-314`, built from Python 3.14.
+Windows 10/11 users can install the verified winget packages from PowerShell:
+
+```powershell
+winget install Python.Python.3.14
+winget install yt-dlp.yt-dlp
+winget install Gyan.FFmpeg
+```
+
+Restart the terminal after installation, then run `.\cli\doctor.ps1`. ListenKit checks `yt-dlp.exe` and `ffmpeg.exe` on `PATH`; it does not silently install system packages.
+
+Python 3.14 is required for the faster-whisper runtime. On macOS, Homebrew Python 3.14 is the supported bootstrap Python. Other lightweight maintenance scripts remain compatible with Python 3.10+.
+
+The default ASR environment is platform-specific:
+
+- macOS and Linux Bash: `~/Library/Caches/ListenKit/venvs/cpython-314`
+- Windows PowerShell: `%LOCALAPPDATA%\ListenKit\venvs\cpython-314`
+
+On a typical Windows installation, the latter expands to `C:\Users\<username>\AppData\Local\ListenKit\venvs\cpython-314`, and its interpreter is `Scripts\python.exe`. WSL uses the Linux/Bash path inside the WSL filesystem, not the Windows path.
 
 The runtime is deliberately stored outside the repository and outside iCloud Drive. It contains large native libraries whose loading can stall while iCloud is hydrating or coordinating files. Do not place the runtime under `Library/Mobile Documents`.
 
@@ -38,6 +55,17 @@ Check an existing environment without changing it:
 cli/check-runtime.sh
 ```
 
+Windows PowerShell has native initialization, health-check, diagnosis, and complete transcript entrypoints:
+
+```powershell
+.\cli\init-faster-whisper.ps1
+.\cli\check-runtime.ps1
+.\cli\doctor.ps1
+.\cli\generate-markdown.ps1 --input "C:\Media\sample.m4a" --language English --output work\sample.md --auto-init --device auto
+```
+
+The Windows entrypoints support Windows PowerShell 5.1 and PowerShell 7 and run through the shared cross-platform Python core. They do not require Bash or WSL. Apple Speech remains macOS-only; Windows uses faster-whisper.
+
 Do not initialize with `python3 -m venv .venv` in the repository. Use the ListenKit initializer so the native runtime remains outside iCloud and uses the supported Python version.
 
 To use a different runtime location, set `LISTENKIT_FASTER_WHISPER_VENV_DIR`. The target must remain outside iCloud Drive:
@@ -47,6 +75,13 @@ LISTENKIT_FASTER_WHISPER_VENV_DIR=/path/outside/icloud \
   cli/init-faster-whisper.sh
 ```
 
+In PowerShell:
+
+```powershell
+$env:LISTENKIT_FASTER_WHISPER_VENV_DIR = "D:\ListenKit\venvs\cpython-314"
+.\cli\init-faster-whisper.ps1
+```
+
 Advanced users can use an external Python environment:
 
 ```bash
@@ -54,14 +89,48 @@ FASTER_WHISPER_PYTHON=/path/to/python \
   cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP
 ```
 
+In PowerShell:
+
+```powershell
+$env:FASTER_WHISPER_PYTHON = "D:\Python\faster-whisper\Scripts\python.exe"
+.\cli\transcribe-audio.ps1 --audio-path work\audio\sample.m4a --locale ja-JP
+```
+
 Default settings:
 
 - model: `small`
-- device: `cpu`
-- compute type: `int8`
 - beam size: `5`
+- macOS/Linux Bash: `cpu` + `int8`
+- native Windows/Python: automatic device and compute-type selection
 
-This is the recommended starting point for an 8 GB Mac. The first run may download the model and take significantly longer than later cached runs.
+On native Windows, automatic selection uses CUDA only when CTranslate2 can
+enumerate a compatible NVIDIA device. It prefers `float16` when at least 3072
+MiB of dedicated VRAM is free, uses `int8_float16` for a compatible device with
+2048–3072 MiB free, and otherwise uses `cpu` + `int8`. NVIDIA Pascal or older,
+AMD Radeon, and Intel Arc/Iris devices stay on CPU in automatic mode.
+
+GPU execution additionally requires NVIDIA's matching CUDA 12, cuBLAS, and
+cuDNN runtime libraries. ListenKit does not silently install system GPU drivers
+or CUDA libraries. `doctor.ps1` reports the CUDA devices visible to CTranslate2,
+their supported compute types, memory information, and the automatic choice.
+
+Device controls:
+
+```powershell
+# Safe automatic selection and CPU fallback (default)
+.\cli\transcribe-audio.ps1 --audio-path work\audio\sample.m4a --locale ja-JP --device auto
+
+# Reproducible CPU-only execution
+.\cli\transcribe-audio.ps1 --audio-path work\audio\sample.m4a --locale ja-JP --device cpu
+
+# Require CUDA device 0; failure is reported and never hidden by CPU fallback
+.\cli\transcribe-audio.ps1 --audio-path work\audio\sample.m4a --locale ja-JP --device cuda --device-index 0 --compute-type float16
+```
+
+The same settings can be supplied with `LISTENKIT_ASR_DEVICE`,
+`LISTENKIT_ASR_COMPUTE_TYPE`, and `LISTENKIT_CUDA_DEVICE_INDEX`. Explicit CLI
+arguments take precedence. The first run may download the model and take
+significantly longer than later cached runs.
 
 Common faster-whisper failures:
 
@@ -72,6 +141,8 @@ Common faster-whisper failures:
 - the selected runtime is not Python 3.14
 - the selected runtime is stored in iCloud Drive
 - the import health check exceeds 60 seconds
+- CUDA was requested but CUDA/cuBLAS/cuDNN is unavailable
+- the selected GPU has insufficient free dedicated VRAM
 
 ## Apple Speech Backend
 

@@ -4,6 +4,8 @@ Local-first multilingual audio and video transcription toolchain. ListenKit turn
 
 ## Quick Try
 
+macOS/Linux/WSL:
+
 ```bash
 git clone <repo-url>
 cd ListenKit
@@ -12,6 +14,24 @@ brew install yt-dlp ffmpeg
 cli/generate-markdown.sh --help
 cli/generate-markdown.sh --url "https://example.com/video" --language Japanese --output work/sample.md --auto-init
 ```
+
+Windows 10/11 PowerShell:
+
+```powershell
+winget install Python.Python.3.14
+winget install yt-dlp.yt-dlp
+winget install Gyan.FFmpeg
+.\cli\generate-markdown.ps1 --help
+.\cli\generate-markdown.ps1 --url "https://example.com/video" --language Japanese --output work\sample.md --auto-init
+```
+
+The Windows workflow is native: it does not require Bash, WSL, Git Bash, or MSYS2. If script execution is restricted, run the same entrypoint with `powershell -ExecutionPolicy Bypass -File .\cli\generate-markdown.ps1 ...`.
+
+Windows ASR defaults to safe device auto-selection: compatible modern NVIDIA
+CUDA devices are used when runtime and VRAM checks pass; CUDA failures retry a
+lower-memory precision and then CPU INT8. AMD, Intel, legacy NVIDIA, and systems
+without a working CUDA runtime stay on CPU. Use `--device cpu` for reproducible
+CPU-only execution or `--device cuda` to require CUDA without silent CPU fallback.
 
 This writes:
 
@@ -28,6 +48,8 @@ If you know your agent rules or context path:
 cli/install-agent-instructions.sh --target <your-agent-rules-file-or-dir>
 ```
 
+On Windows, use `.\cli\install-agent-instructions.ps1` with the same arguments.
+
 If you do not know the target path yet, use the `--print` fallback described in `LLM_INTEGRATION.md`.
 
 ## Documentation
@@ -36,13 +58,18 @@ If you do not know the target path yet, use the `--print` fallback described in 
 - `docs/install.md`: dependencies, backend setup, and troubleshooting
 - `docs/debugging.md`: lower-level maintenance and debugging interfaces
 - `docs/output-format.md`: transcript Markdown and JSON output shape
-- `cli/check-runtime.sh`: read-only Python 3.14 and faster-whisper health check
+- `cli/check-runtime.sh`: read-only Python 3.14 and faster-whisper health check for Bash environments
+- `cli/init-faster-whisper.ps1`: native Windows faster-whisper runtime initializer
+- `cli/check-runtime.ps1`: native Windows runtime health check
+- `cli/generate-markdown.ps1`: native Windows public transcript entrypoint
+- `cli/doctor.ps1`: read-only Windows platform and dependency diagnosis
 
 ## What It Does
 
 ```text
 URL or local media
-  -> cli/generate-markdown.sh
+  -> cli/generate-markdown.sh (macOS/Linux/WSL)
+     or cli\generate-markdown.ps1 (native Windows)
   -> transcript Markdown + same-stem transcript JSON
 ```
 
@@ -72,6 +99,8 @@ Output:
 - Cursor: `adapters/cursor/foreign-listening.md`
 
 Adapters should call the public `cli/generate-markdown.sh` entrypoint for normal use, then consume either the generated Markdown or same-stem JSON. They should not reimplement import, subtitle extraction, transcription, rendering, or downstream note systems.
+
+On Windows, adapters use `.\cli\generate-markdown.ps1` instead. Both entrypoints preserve the same parameters and output contract.
 
 ## Privacy and Copyright
 

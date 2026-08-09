@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 GENERATE_SCRIPT = REPO_ROOT / "cli" / "generate-markdown.sh"
 
 
+@unittest.skipIf(os.name == "nt", "Bash wrapper compatibility is tested on Unix CI")
 class GenerateMarkdownTests(unittest.TestCase):
     def write_fake_python(self, path: Path) -> None:
         path.write_text(

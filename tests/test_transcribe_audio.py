@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 TRANSCRIBE_SCRIPT = REPO_ROOT / "cli" / "transcribe-audio.sh"
 
 
+@unittest.skipIf(os.name == "nt", "Bash wrapper compatibility is tested on Unix CI")
 class TranscribeAudioTests(unittest.TestCase):
     def write_fake_python(self, path: Path, log_path: Optional[Path] = None) -> None:
         log_line = f"printf '%s\\n' \"$0 $*\" >> {str(log_path)!r}\n" if log_path else ""

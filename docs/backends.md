@@ -1,7 +1,7 @@
 # Backends
 
 This is a maintenance reference for ListenKit internals. External LLM agents
-should follow `LLM_INTEGRATION.md` and call `cli/generate-markdown.sh` instead
+should follow `LLM_INTEGRATION.md` and call the platform public entrypoint instead
 of calling backend commands directly.
 
 ## v1
@@ -18,27 +18,54 @@ The default CLI boundary is:
 cli/transcribe-audio.sh --audio-path <path> --locale <bcp47> --auto-init
 ```
 
-The faster-whisper Python selection order is:
+Native Windows uses `.\cli\transcribe-audio.ps1` with the same arguments.
+
+The faster-whisper Python selection order in Bash is:
 
 1. `FASTER_WHISPER_PYTHON`
 2. `LISTENKIT_FASTER_WHISPER_VENV_PYTHON`, when explicitly set
 3. `~/Library/Caches/ListenKit/venvs/cpython-314/bin/python`
 4. authorized initialization through `--auto-init`, `LISTENKIT_AUTO_INIT=1`, or an interactive TTY prompt
 
-Non-interactive callers should pass `--auto-init` or run `cli/init-faster-whisper.sh` before transcription.
+On native Windows, `.\cli\init-faster-whisper.ps1`, `.\cli\check-runtime.ps1`, and `.\cli\transcribe-audio.ps1` use `%LOCALAPPDATA%\ListenKit\venvs\cpython-314\Scripts\python.exe` by default. `LISTENKIT_FASTER_WHISPER_VENV_DIR` overrides the environment directory on every supported platform. WSL follows the Bash/Linux path rather than the native Windows path.
 
-The Cache runtime is owned exclusively by ListenKit. Downstream projects must call ListenKit through its CLI and JSON contract; they must not import packages from this environment. `cli/check-runtime.sh` verifies Python 3.14, the runtime location, the installed faster-whisper distribution, and a bounded import without modifying the environment.
+The native Windows public boundary is `.\cli\generate-markdown.ps1`; it provides the same URL/local-media, subtitle-first, ASR-fallback, JSON, and Markdown contract as the Bash entrypoint without requiring Bash.
+
+Non-interactive callers should pass `--auto-init` or run the platform `init-faster-whisper` entrypoint before transcription.
+
+The Cache runtime is owned exclusively by ListenKit. Downstream projects must call ListenKit through its CLI and JSON contract; they must not import packages from this environment. The platform `check-runtime` entrypoint verifies Python 3.14, the runtime location, the installed faster-whisper distribution, and a bounded import without modifying the environment.
 
 The runtime must not live under iCloud Drive (`Library/Mobile Documents`). It contains native libraries and model dependencies that need predictable local filesystem access. `LISTENKIT_FASTER_WHISPER_VENV_DIR` can override the default root, but the initializer and health check reject iCloud-backed targets.
 
 Avoid documenting or using raw `python3 -m venv .venv` setup commands. They bypass the supported runtime path and health checks.
 
-Fixed faster-whisper defaults:
+Fixed faster-whisper model defaults:
 
 - model: `small`
-- device: `cpu`
-- compute type: `int8`
 - beam size: `5`
+
+The Bash entrypoint keeps the established `cpu` + `int8` baseline. The native
+Windows/Python entrypoint defaults to `--device auto --compute-type auto`:
+
+1. Query CTranslate2 for actual CUDA devices and supported compute types.
+2. Merge NVIDIA name, Compute Capability, and dedicated free VRAM from
+   `nvidia-smi` when it is available.
+3. Use CUDA automatically only for Compute Capability 7.0 or newer and at least
+   2048 MiB of free dedicated VRAM.
+4. Prefer `float16` with at least 3072 MiB free; prefer `int8_float16` between
+   2048 and 3072 MiB.
+5. On CUDA library or out-of-memory failure, retry a lower-memory CUDA type and
+   then `cpu` + `int8`.
+
+The auto policy does not infer compatibility from a marketing model name alone.
+AMD and Intel GPUs remain on the optimized CPU path with the standard runtime.
+Pascal and older NVIDIA GPUs also remain on CPU in auto mode; advanced users can
+explicitly test a supported CUDA compute type.
+
+Explicit `--device cuda` never silently falls back to CPU. It fails with the
+CUDA diagnostic after any lower-memory CUDA retry. `--device cpu` always avoids
+CUDA probing. The equivalent environment controls are `LISTENKIT_ASR_DEVICE`,
+`LISTENKIT_ASR_COMPUTE_TYPE`, and `LISTENKIT_CUDA_DEVICE_INDEX`.
 
 Apple Speech can be forced with:
 
@@ -57,7 +84,9 @@ Any helper must return:
 - `segments`
 - `timing_complete`
 
-The subtitle backend uses the same transcript JSON shape. It is only used for URL input by `cli/generate-markdown.sh`; `cli/transcribe-audio.sh` remains a local audio ASR command.
+The subtitle backend uses the same transcript JSON shape. It is only used for URL input by the platform `generate-markdown` entrypoint; the platform `transcribe-audio` command remains a local audio ASR command.
+
+The corresponding native Windows commands use the same basenames with `.ps1` extensions.
 
 Readers accept legacy payloads without `schema_version` as v1 for compatibility. An explicit version other than `1` is unsupported and must fail before rendering or downstream processing.
 

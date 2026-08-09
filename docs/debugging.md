@@ -9,6 +9,12 @@ Normal integrations should call:
 cli/generate-markdown.sh (--url <url>|--input <path>) --language <label> --output <md>
 ```
 
+On native Windows:
+
+```powershell
+.\cli\generate-markdown.ps1 (--url <url>|--input <path>) --language <label> --output <md>
+```
+
 The command also writes a same-stem transcript JSON file next to the Markdown
 output. External agents should consume that JSON instead of calling the lower
 levels directly.
@@ -22,6 +28,8 @@ pipeline debugging:
 - `cli/extract-subtitles.sh`: URL subtitles -> transcript JSON
 - `cli/transcribe-audio.sh`: local audio file -> transcript JSON
 - `cli/render-listening-note.py`: transcript JSON -> transcript Markdown
+
+Native Windows provides matching `.ps1` commands for import, subtitle extraction, transcription, and the public workflow. `.\cli\doctor.ps1` reports resolved dependencies and runtime health without changing the system.
 
 Use them only when investigating a specific stage or maintaining ListenKit.
 
@@ -44,4 +52,3 @@ conversion, output placement, and transcript normalization.
 
 Raw downloader calls are appropriate only while debugging downloader behavior or
 writing focused tests for ListenKit internals.
-

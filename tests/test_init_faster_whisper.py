@@ -12,6 +12,7 @@ REQUIREMENTS = REPO_ROOT / "requirements-faster-whisper.txt"
 PYTHON314 = Path("/opt/homebrew/bin/python3.14")
 
 
+@unittest.skipIf(os.name == "nt", "Bash wrapper compatibility is tested on Unix CI")
 class InitFasterWhisperTests(unittest.TestCase):
     def test_requirements_pin_only_direct_faster_whisper_dependency(self) -> None:
         requirements = [

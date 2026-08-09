@@ -14,6 +14,8 @@ If a user asks you to read this GitHub repository and install ListenKit:
    cli/install-agent-instructions.sh --target <agent-rules-file-or-dir>
    ```
 
+   On Windows, use `.\cli\install-agent-instructions.ps1 --target <agent-rules-file-or-dir>`.
+
 4. If you do not know the persistent rules/context target, do not guess. Use this exact prompt:
 
    ```text
@@ -27,6 +29,8 @@ If a user asks you to read this GitHub repository and install ListenKit:
    ```
 
 `cli/install-agent-instructions.sh` installs agent instructions only. It does not install Homebrew packages, Python, faster-whisper, Apple Speech assets, or ASR model files.
+
+The corresponding native Windows installer is `.\cli\install-agent-instructions.ps1`; it has the same limited scope.
 
 If a user asks you to read this GitHub repository and use ListenKit once, you may skip persistent installation and run the public entrypoint directly. If the user did not specify `--output`, prefer `work/<safe-source-stem>-transcript.md`; if no stable source stem is available, use `work/transcript.md`. Tell the user when you used ListenKit only for the current task and did not complete persistent agent installation.
 
@@ -42,6 +46,18 @@ cli/generate-markdown.sh \
   --auto-init
 ```
 
+On native Windows, use the matching PowerShell entrypoint:
+
+```powershell
+.\cli\generate-markdown.ps1 `
+  --url "https://example.com/video" `
+  --language Japanese `
+  --output work\sample-transcript.md `
+  --auto-init
+```
+
+Use `.sh` on macOS/Linux/WSL and `.ps1` on native Windows. Do not route native Windows through WSL: WSL has a separate filesystem, runtime path, and dependency environment.
+
 For local media, replace `--url <url>` with `--input <path>`.
 
 ListenKit owns source acquisition, subtitle selection, ASR fallback, transcript normalization, and plain transcript rendering behind this entrypoint. External agents should not reimplement or bypass those stages.
@@ -56,7 +72,7 @@ For an output path like:
 work/sample-transcript.md
 ```
 
-`cli/generate-markdown.sh` produces:
+The platform public entrypoint produces:
 
 - `work/sample-transcript.md`: human-readable transcript Markdown
 - `work/sample-transcript.json`: structured transcript JSON with normalized text, segments, source engine metadata, locale, and timing status
@@ -83,6 +99,8 @@ In normal integrations, do not call these directly as a shortcut:
 - `cli/transcribe-audio.sh`
 - `cli/import-audio.sh`
 - `cli/render-listening-note.py`
+
+On Windows, the corresponding lower-level `.ps1` commands are subject to the same restriction.
 
 These are dependency, maintenance, or debugging interfaces. Calling them directly can skip ListenKit's subtitle priority, cleanup, ASR fallback, output naming, provenance, or transcript JSON normalization behavior.
 

@@ -13,6 +13,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--locale", default="ja-JP")
     parser.add_argument("--model", default="small")
     parser.add_argument("--compute-type", default="int8")
+    parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    parser.add_argument("--device-index", type=int, default=0)
     parser.add_argument("--beam-size", type=int, default=5)
     return parser.parse_args()
 
@@ -46,7 +48,12 @@ def main() -> int:
     try:
         from faster_whisper import WhisperModel
 
-        model = WhisperModel(args.model, device="cpu", compute_type=args.compute_type)
+        model = WhisperModel(
+            args.model,
+            device=args.device,
+            device_index=args.device_index,
+            compute_type=args.compute_type,
+        )
         segments_iter, info = model.transcribe(
             str(audio_path),
             language=locale_to_language(args.locale),
@@ -68,6 +75,8 @@ def main() -> int:
                 "schema_version": 1,
                 "engine": "faster-whisper",
                 "model": args.model,
+                "device": args.device,
+                "device_index": args.device_index,
                 "compute_type": args.compute_type,
                 "locale": args.locale,
                 "language": info.language,
