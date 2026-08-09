@@ -6,11 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
+from .cuda_runtime import cuda_runtime_environment
 from .errors import CommandExecutionError, ListenKitError
 from .process import find_command, run_command
 
 CUDA_PROBE_TIMEOUT_SECONDS = 20
-CUDA_MIN_FREE_MIB = 2048
 CUDA_FLOAT16_FREE_MIB = 3072
 
 ALLOWED_DEVICES = {"auto", "cpu", "cuda"}
@@ -29,8 +29,20 @@ CUDA_PROBE_CODE = """
 import json
 try:
     import ctypes
+    import os
     import ctranslate2
     import sys
+    dll_directory_handles = []
+    library_dirs = [
+        value for value in os.environ.get("LISTENKIT_CUDA_LIBRARY_DIRS", "").split(os.pathsep)
+        if value
+    ]
+    if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+        for directory in library_dirs:
+            try:
+                dll_directory_handles.append(os.add_dll_directory(directory))
+            except OSError:
+                pass
     count = ctranslate2.get_cuda_device_count()
     devices = []
     for index in range(count):
@@ -49,12 +61,20 @@ try:
             loader = ctypes.CDLL
             names = ("libcublas.so.12", "libcublasLt.so.12", "libcudnn.so.9")
         for name in names:
-            try:
-                loader(name)
-                libraries[name] = True
-            except OSError:
-                libraries[name] = False
-    required = tuple(name for name in libraries if "cublas" in name.casefold())
+            candidates = [os.path.join(directory, name) for directory in library_dirs]
+            candidates.append(name)
+            libraries[name] = False
+            for candidate in candidates:
+                try:
+                    loader(candidate)
+                    libraries[name] = True
+                    break
+                except OSError:
+                    pass
+    required = tuple(
+        name for name in libraries
+        if "cublas" in name.casefold() or "cudnn" in name.casefold()
+    )
     missing = [name for name in required if not libraries[name]]
     payload = {"devices": devices, "libraries": libraries}
     if missing:
@@ -102,7 +122,10 @@ def probe_cuda_devices(
     *,
     environment: Mapping[str, str] | None = None,
 ) -> CudaProbe:
-    env = dict(os.environ if environment is None else environment)
+    env = cuda_runtime_environment(
+        python_executable,
+        environment=os.environ if environment is None else environment,
+    )
     try:
         result = run_command(
             [python_executable, "-c", CUDA_PROBE_CODE],
@@ -220,21 +243,6 @@ def select_asr_device(
             reason="CUDA and compute type were explicitly selected",
             supported_compute_types=supported,
         )
-
-    if requested_device == "auto":
-        if device.compute_capability is not None and device.compute_capability < 7.0:
-            return _cpu_selection(
-                "auto",
-                f"CUDA compute capability {device.compute_capability:g} is below the automatic GPU threshold 7.0",
-            )
-        if (
-            device.free_memory_mib is not None
-            and device.free_memory_mib < CUDA_MIN_FREE_MIB
-        ):
-            return _cpu_selection(
-                "auto",
-                f"CUDA device has only {device.free_memory_mib} MiB free memory",
-            )
 
     compute_type = _automatic_cuda_compute_type(device)
     if not compute_type:

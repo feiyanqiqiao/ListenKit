@@ -29,7 +29,7 @@ pipeline debugging:
 - `cli/transcribe-audio.sh`: local audio file -> transcript JSON
 - `cli/render-listening-note.py`: transcript JSON -> transcript Markdown
 
-Native Windows provides matching `.ps1` commands for import, subtitle extraction, transcription, and the public workflow. `.\cli\doctor.ps1` reports resolved dependencies and runtime health without changing the system.
+Native Windows provides matching `.ps1` commands for import, subtitle extraction, transcription, and the public workflow. `.\cli\doctor.ps1` reports resolved dependencies, NVIDIA driver visibility, managed CUDA libraries, selected accelerator, and runtime health without changing the system. CUDA preparation is performed only by initialization/auto-init, never by `doctor`.
 
 Use them only when investigating a specific stage or maintaining ListenKit.
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Mapping
 
 from .asr_device import probe_cuda_devices, select_asr_device
+from .cuda_runtime import nvidia_driver_available
 from .health import RuntimeHealthError, inspect_runtime
 from .platform_paths import (
     default_runtime_dir,
@@ -38,6 +39,21 @@ def doctor_lines(environment: Mapping[str, str] | None = None) -> list[str]:
         f"huggingface_hub_cache={hub_cache}",
         f"model_small_cache={'ready' if model_ready else 'missing'}",
     ]
+    if current_platform == "macos":
+        lines.extend(
+            [
+                "acceleration_backend=apple-accelerate",
+                "acceleration_kind=optimized-cpu",
+                "gpu_backend=unsupported-by-ctranslate2-macos-wheel",
+            ]
+        )
+    elif current_platform in {"windows", "linux"}:
+        lines.extend(
+            [
+                "acceleration_backend=cuda-or-optimized-cpu",
+                f"nvidia_driver={'ready' if nvidia_driver_available(env) else 'missing'}",
+            ]
+        )
     try:
         metadata = inspect_runtime(runtime_python, environment=env)
         lines.extend(metadata.as_lines())
@@ -46,6 +62,9 @@ def doctor_lines(environment: Mapping[str, str] | None = None) -> list[str]:
         lines.append(f"cuda_device_count={len(probe.devices)}")
         if probe.error:
             lines.append(f"cuda_probe_error={probe.error}")
+            lines.append("cuda_runtime=unprepared")
+        elif probe.devices:
+            lines.append("cuda_runtime=ready")
         for library, available in probe.libraries:
             safe_name = library.replace(".", "_").replace("-", "_")
             lines.append(

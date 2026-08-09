@@ -27,11 +27,14 @@ winget install Gyan.FFmpeg
 
 The Windows workflow is native: it does not require Bash, WSL, Git Bash, or MSYS2. If script execution is restricted, run the same entrypoint with `powershell -ExecutionPolicy Bypass -File .\cli\generate-markdown.ps1 ...`.
 
-Windows ASR defaults to safe device auto-selection: compatible modern NVIDIA
-CUDA devices are used when runtime and VRAM checks pass; CUDA failures retry a
-lower-memory precision and then CPU INT8. AMD, Intel, legacy NVIDIA, and systems
-without a working CUDA runtime stay on CPU. Use `--device cpu` for reproducible
-CPU-only execution or `--device cuda` to require CUDA without silent CPU fallback.
+ASR defaults to acceleration-first device selection. On Windows and Linux,
+initialization detects an NVIDIA GPU, installs CUDA 12 cuBLAS and cuDNN 9 into
+ListenKit's isolated runtime, and uses the compute types CTranslate2 reports as
+supported. A failed CUDA attempt retries a lower-memory CUDA precision before
+falling back to CPU INT8. macOS uses CTranslate2's Apple Accelerate optimized
+CPU backend; the current CTranslate2 macOS wheel has no Metal/MPS GPU backend.
+Use `--device cpu` for reproducible CPU-only execution or `--device cuda` to
+require CUDA without silent CPU fallback.
 
 This writes:
 

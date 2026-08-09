@@ -14,6 +14,7 @@ from .asr_device import (
     probe_cuda_devices,
     select_asr_device,
 )
+from .cuda_runtime import cuda_runtime_environment
 from .errors import ListenKitError, RuntimeHealthError
 from .health import can_import_faster_whisper
 from .platform_paths import (
@@ -22,7 +23,7 @@ from .platform_paths import (
     selected_runtime_python,
 )
 from .process import run_command
-from .runtime import initialize_runtime, repository_root
+from .runtime import initialize_runtime, prepare_runtime_acceleration, repository_root
 
 
 def _managed_runtime_python(environment: Mapping[str, str]) -> Path:
@@ -103,6 +104,13 @@ def transcribe_audio(
             [helper, "--audio-path", audio_path, "--locale", locale], check=False
         )
     else:
+        requested_device = device or env.get("LISTENKIT_ASR_DEVICE", "auto")
+        requested_compute_type = compute_type or env.get(
+            "LISTENKIT_ASR_COMPUTE_TYPE", "auto"
+        )
+        acceleration_preparation_authorized = (
+            auto_init or env.get("LISTENKIT_AUTO_INIT") == "1"
+        )
         explicit = env.get("FASTER_WHISPER_PYTHON")
         python_executable = Path(explicit) if explicit else _managed_runtime_python(env)
         healthy = False
@@ -121,7 +129,22 @@ def transcribe_audio(
                     ".\\cli\\init-faster-whisper.ps1 on Windows or "
                     "cli/init-faster-whisper.sh on macOS/Linux, or pass --auto-init."
                 )
-            python_executable = initialize_runtime(environment=env)
+            python_executable = initialize_runtime(
+                environment=env,
+                require_cuda=requested_device == "cuda",
+            )
+        elif (
+            not explicit
+            and requested_device != "cpu"
+            and acceleration_preparation_authorized
+        ):
+            prepare_runtime_acceleration(
+                python_executable,
+                environment=env,
+                require_cuda=requested_device == "cuda",
+            )
+
+        env = cuda_runtime_environment(python_executable, environment=env)
 
         helper = Path(
             env.get(
@@ -135,10 +158,6 @@ def transcribe_audio(
             env.setdefault("HF_HUB_OFFLINE", "1")
             env.setdefault("TRANSFORMERS_OFFLINE", "1")
 
-        requested_device = device or env.get("LISTENKIT_ASR_DEVICE", "auto")
-        requested_compute_type = compute_type or env.get(
-            "LISTENKIT_ASR_COMPUTE_TYPE", "auto"
-        )
         selected_index = _selected_device_index(device_index, env)
         probe = (
             CudaProbe(())

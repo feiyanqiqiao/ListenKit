@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -30,6 +31,20 @@ def emit(payload: dict, status: int = 0) -> int:
     return status
 
 
+def configure_cuda_library_search() -> list[object]:
+    handles: list[object] = []
+    if sys.platform != "win32" or not hasattr(os, "add_dll_directory"):
+        return handles
+    for directory in os.environ.get("LISTENKIT_CUDA_LIBRARY_DIRS", "").split(os.pathsep):
+        if not directory:
+            continue
+        try:
+            handles.append(os.add_dll_directory(directory))
+        except OSError:
+            pass
+    return handles
+
+
 def main() -> int:
     args = parse_args()
     audio_path = Path(args.audio_path)
@@ -46,6 +61,7 @@ def main() -> int:
         )
 
     try:
+        dll_directory_handles = configure_cuda_library_search()
         from faster_whisper import WhisperModel
 
         model = WhisperModel(

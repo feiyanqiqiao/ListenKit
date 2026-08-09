@@ -96,6 +96,7 @@ class WindowsRuntimeTests(unittest.TestCase):
             )
             env = os.environ.copy()
             env["LISTENKIT_FASTER_WHISPER_VENV_DIR"] = str(venv_dir)
+            env["LISTENKIT_CUDA_AUTO_PREPARE"] = "0"
             for host in powershell_hosts():
                 with self.subTest(host=host):
                     initialized = subprocess.run(

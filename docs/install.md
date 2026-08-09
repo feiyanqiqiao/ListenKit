@@ -41,7 +41,10 @@ The default ASR backend is `faster-whisper`:
 cli/transcribe-audio.sh --audio-path work/audio/sample.m4a --locale ja-JP --auto-init
 ```
 
-`--auto-init` authorizes ListenKit to create the local Cache runtime, install `faster-whisper`, and continue transcription. For a one-time manual setup, run this script from anywhere:
+`--auto-init` authorizes ListenKit to create the local Cache runtime, install
+`faster-whisper`, and, when an NVIDIA GPU is detected on Windows or Linux,
+prepare the managed CUDA runtime before continuing transcription. For a
+one-time manual setup, run this script from anywhere:
 
 ```bash
 cli/init-faster-whisper.sh
@@ -100,19 +103,31 @@ Default settings:
 
 - model: `small`
 - beam size: `5`
-- macOS/Linux Bash: `cpu` + `int8`
-- native Windows/Python: automatic device and compute-type selection
+- Windows/Linux NVIDIA: automatic CUDA preparation and compute-type selection
+- Windows/Linux without NVIDIA: optimized `cpu` + `int8`
+- macOS: CTranslate2 Apple Accelerate optimized CPU backend + `int8`
 
-On native Windows, automatic selection uses CUDA only when CTranslate2 can
-enumerate a compatible NVIDIA device. It prefers `float16` when at least 3072
-MiB of dedicated VRAM is free, uses `int8_float16` for a compatible device with
-2048–3072 MiB free, and otherwise uses `cpu` + `int8`. NVIDIA Pascal or older,
-AMD Radeon, and Intel Arc/Iris devices stay on CPU in automatic mode.
+On Windows and Linux, automatic selection first checks the NVIDIA driver and
+CTranslate2 device capabilities. Initialization installs `nvidia-cublas-cu12`
+and `nvidia-cudnn-cu12` into ListenKit's isolated venv when needed; it does not
+modify a system CUDA installation. Package DLL/shared-library directories are
+injected only into ListenKit child processes. The policy prefers `float16` when
+at least 3072 MiB of dedicated VRAM is free and prefers `int8_float16` below
+that threshold when supported. Older or temporarily memory-constrained NVIDIA
+devices are still attempted with a supported lower-memory compute type instead
+of being rejected from model name, age, or a static VRAM threshold.
 
-GPU execution additionally requires NVIDIA's matching CUDA 12, cuBLAS, and
-cuDNN runtime libraries. ListenKit does not silently install system GPU drivers
-or CUDA libraries. `doctor.ps1` reports the CUDA devices visible to CTranslate2,
-their supported compute types, memory information, and the automatic choice.
+ListenKit never installs or changes the NVIDIA system driver. If the driver is
+present, the managed CUDA dependencies are prepared by `--auto-init` or the
+platform `init-faster-whisper` command. Set `LISTENKIT_CUDA_AUTO_PREPARE=0` only
+to disable this behavior deliberately. `doctor` remains read-only and reports
+the driver, managed libraries, devices, compute types, memory, and automatic
+choice.
+
+On macOS, this backend is named **Apple Accelerate**. It is an optimized CPU
+backend used automatically by the CTranslate2 wheel, not Metal/MPS GPU
+execution. The optional `--engine apple` backend uses Apple's Speech framework,
+whose hardware scheduling is controlled by macOS.
 
 Device controls:
 
@@ -141,8 +156,10 @@ Common faster-whisper failures:
 - the selected runtime is not Python 3.14
 - the selected runtime is stored in iCloud Drive
 - the import health check exceeds 60 seconds
-- CUDA was requested but CUDA/cuBLAS/cuDNN is unavailable
-- the selected GPU has insufficient free dedicated VRAM
+- CUDA preparation failed because the driver, package download, or managed
+  cuBLAS/cuDNN libraries are unavailable
+- every supported CUDA precision failed (for example due to actual OOM), after
+  which automatic mode records the reason and uses CPU
 
 ## Apple Speech Backend
 

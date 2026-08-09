@@ -44,23 +44,25 @@ Fixed faster-whisper model defaults:
 - model: `small`
 - beam size: `5`
 
-The Bash entrypoint keeps the established `cpu` + `int8` baseline. The native
-Windows/Python entrypoint defaults to `--device auto --compute-type auto`:
+The Bash and native Windows entrypoints both use the Python core's
+`--device auto --compute-type auto` policy:
 
 1. Query CTranslate2 for actual CUDA devices and supported compute types.
 2. Merge NVIDIA name, Compute Capability, and dedicated free VRAM from
    `nvidia-smi` when it is available.
-3. Use CUDA automatically only for Compute Capability 7.0 or newer and at least
-   2048 MiB of free dedicated VRAM.
-4. Prefer `float16` with at least 3072 MiB free; prefer `int8_float16` between
-   2048 and 3072 MiB.
-5. On CUDA library or out-of-memory failure, retry a lower-memory CUDA type and
-   then `cpu` + `int8`.
+3. When an NVIDIA driver is present on Windows or Linux, install CUDA 12 cuBLAS
+   and cuDNN 9 into the managed venv if the libraries are not already usable.
+4. Prefer `float16` with at least 3072 MiB free; below that, prefer a supported
+   lower-memory type such as `int8_float16`.
+5. Attempt any NVIDIA generation that CTranslate2 reports as supported. On a
+   CUDA library or out-of-memory failure, retry a lower-memory CUDA type and
+   only then use `cpu` + `int8` in automatic mode.
 
 The auto policy does not infer compatibility from a marketing model name alone.
-AMD and Intel GPUs remain on the optimized CPU path with the standard runtime.
-Pascal and older NVIDIA GPUs also remain on CPU in auto mode; advanced users can
-explicitly test a supported CUDA compute type.
+AMD and Intel GPUs remain on the optimized CPU path because CTranslate2's
+prebuilt GPU backend is CUDA-only. On macOS, CTranslate2 automatically uses its
+Apple Accelerate optimized CPU backend; its prebuilt macOS wheel does not expose
+a Metal/MPS GPU backend.
 
 Explicit `--device cuda` never silently falls back to CPU. It fails with the
 CUDA diagnostic after any lower-memory CUDA retry. `--device cpu` always avoids

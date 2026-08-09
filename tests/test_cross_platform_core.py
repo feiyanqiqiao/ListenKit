@@ -15,6 +15,11 @@ from listenkit_cli.asr_device import (
     probe_cuda_devices,
     select_asr_device,
 )
+from listenkit_cli.cuda_runtime import (
+    CudaDependencyInstall,
+    cuda_library_dirs,
+    cuda_runtime_environment,
+)
 from listenkit_cli.errors import ListenKitError, RuntimeHealthError
 from listenkit_cli.health import can_import_faster_whisper, import_timeout_seconds
 from listenkit_cli.errors import RuntimeImportTimeout
@@ -26,6 +31,7 @@ from listenkit_cli.platform_paths import (
 )
 from listenkit_cli.process import run_command
 from listenkit_cli.rendering import render_transcript
+from listenkit_cli.runtime import prepare_runtime_acceleration
 from listenkit_cli.subtitles import extract_subtitles, parse_vtt
 from listenkit_cli.transcription import transcribe_audio
 from listenkit_cli.workflow import generate_markdown, locale_from_language
@@ -131,6 +137,113 @@ class HealthContractTests(unittest.TestCase):
             self.assertLess(time.monotonic() - started, 5)
 
 
+class AccelerationPreparationTests(unittest.TestCase):
+    def test_managed_cuda_requirements_use_cuda12_and_cudnn9(self) -> None:
+        requirements_path = (
+            Path(__file__).resolve().parents[1]
+            / "requirements-faster-whisper-cuda.txt"
+        )
+        requirements = [
+            line.strip()
+            for line in requirements_path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        self.assertEqual(
+            requirements,
+            ["nvidia-cublas-cu12>=12.4,<13", "nvidia-cudnn-cu12>=9,<10"],
+        )
+
+    def test_python_package_cuda_directories_are_added_to_windows_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            cublas = root / "nvidia" / "cublas" / "bin"
+            cudnn = root / "nvidia" / "cudnn" / "bin"
+            cublas.mkdir(parents=True)
+            cudnn.mkdir(parents=True)
+            result = mock.Mock(
+                returncode=0,
+                stdout=json.dumps([str(cublas), str(cudnn)]),
+                stderr="",
+            )
+            with mock.patch(
+                "listenkit_cli.cuda_runtime.run_command", return_value=result
+            ), mock.patch(
+                "listenkit_cli.cuda_runtime.platform_id", return_value="windows"
+            ):
+                directories = cuda_library_dirs(Path("runtime-python"), environment={})
+                environment = cuda_runtime_environment(
+                    Path("runtime-python"), environment={"PATH": "system-bin"}
+                )
+        self.assertEqual(directories, (cublas, cudnn))
+        self.assertEqual(
+            environment["LISTENKIT_CUDA_LIBRARY_DIRS"],
+            os.pathsep.join((str(cublas), str(cudnn))),
+        )
+        self.assertEqual(
+            environment["PATH"],
+            os.pathsep.join((str(cublas), str(cudnn), "system-bin")),
+        )
+
+    def test_nvidia_runtime_is_installed_then_reprobed(self) -> None:
+        device = CudaDevice(
+            index=0,
+            supported_compute_types=frozenset({"float16"}),
+        )
+        missing = CudaProbe(
+            (device,),
+            "Required CUDA libraries are not loadable: cublas64_12.dll",
+        )
+        ready = CudaProbe((device,))
+        installation = CudaDependencyInstall(True, True, "installed")
+        with mock.patch(
+            "listenkit_cli.runtime.nvidia_driver_available", return_value=True
+        ), mock.patch(
+            "listenkit_cli.runtime.probe_cuda_devices", side_effect=[missing, ready]
+        ) as probe, mock.patch(
+            "listenkit_cli.runtime.install_managed_cuda_dependencies",
+            return_value=installation,
+        ) as installer:
+            acceleration = prepare_runtime_acceleration(
+                Path("runtime-python"), platform="win32", environment={}
+            )
+        self.assertTrue(acceleration.ready)
+        self.assertEqual(acceleration.backend, "cuda")
+        self.assertTrue(acceleration.preparation_attempted)
+        self.assertEqual(probe.call_count, 2)
+        installer.assert_called_once()
+
+    def test_ready_cuda_runtime_is_not_reinstalled(self) -> None:
+        ready = CudaProbe(
+            (
+                CudaDevice(
+                    index=0,
+                    supported_compute_types=frozenset({"float16"}),
+                ),
+            )
+        )
+        with mock.patch(
+            "listenkit_cli.runtime.nvidia_driver_available", return_value=True
+        ), mock.patch(
+            "listenkit_cli.runtime.probe_cuda_devices", return_value=ready
+        ), mock.patch(
+            "listenkit_cli.runtime.install_managed_cuda_dependencies"
+        ) as installer:
+            acceleration = prepare_runtime_acceleration(
+                Path("runtime-python"), platform="linux", environment={}
+            )
+        self.assertTrue(acceleration.ready)
+        self.assertFalse(acceleration.preparation_attempted)
+        installer.assert_not_called()
+
+    def test_macos_reports_apple_accelerate_not_gpu(self) -> None:
+        acceleration = prepare_runtime_acceleration(
+            Path("runtime-python"), platform="darwin", environment={}
+        )
+        self.assertEqual(acceleration.backend, "apple-accelerate")
+        self.assertTrue(acceleration.ready)
+        self.assertIn("Metal/MPS", acceleration.message)
+
+
 class AsrDevicePolicyTests(unittest.TestCase):
     def test_modern_nvidia_with_headroom_uses_float16(self) -> None:
         selection = select_asr_device(
@@ -170,26 +283,32 @@ class AsrDevicePolicyTests(unittest.TestCase):
         self.assertEqual(selection.device, "cuda")
         self.assertEqual(selection.compute_type, "int8_float16")
 
-    def test_low_memory_or_legacy_nvidia_stays_on_cpu_in_auto_mode(self) -> None:
+    def test_low_memory_or_legacy_nvidia_is_still_tried_in_auto_mode(self) -> None:
         cases = (
-            CudaDevice(
-                index=0,
-                compute_capability=8.6,
-                free_memory_mib=1024,
-                supported_compute_types=frozenset({"float16", "int8_float16"}),
+            (
+                CudaDevice(
+                    index=0,
+                    compute_capability=8.6,
+                    free_memory_mib=1024,
+                    supported_compute_types=frozenset({"float16", "int8_float16"}),
+                ),
+                "int8_float16",
             ),
-            CudaDevice(
-                index=0,
-                compute_capability=6.1,
-                free_memory_mib=8192,
-                supported_compute_types=frozenset({"int8_float32", "float32"}),
+            (
+                CudaDevice(
+                    index=0,
+                    compute_capability=6.1,
+                    free_memory_mib=8192,
+                    supported_compute_types=frozenset({"int8_float32", "float32"}),
+                ),
+                "int8_float32",
             ),
         )
-        for device in cases:
+        for device, expected_compute_type in cases:
             with self.subTest(device=device):
                 selection = select_asr_device(CudaProbe((device,)))
-                self.assertEqual(selection.device, "cpu")
-                self.assertEqual(selection.compute_type, "int8")
+                self.assertEqual(selection.device, "cuda")
+                self.assertEqual(selection.compute_type, expected_compute_type)
 
     def test_explicit_pascal_cuda_uses_supported_int8_float32(self) -> None:
         selection = select_asr_device(

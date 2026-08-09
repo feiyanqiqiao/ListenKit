@@ -20,6 +20,9 @@ class TranscribeAudioTests(unittest.TestCase):
             "if [[ \"$1\" == \"-c\" ]]; then\n"
             "  exit 0\n"
             "fi\n"
+            "if [[ \"$1\" == \"-m\" && \"$2\" == \"listenkit_cli\" ]]; then\n"
+            "  exec \"$LISTENKIT_FASTER_WHISPER_HELPER\"\n"
+            "fi\n"
             "exec /bin/sh \"$@\"\n",
             encoding="utf-8",
         )

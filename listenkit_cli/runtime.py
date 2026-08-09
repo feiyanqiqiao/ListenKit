@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
+from .asr_device import CudaProbe, probe_cuda_devices
+from .cuda_runtime import install_managed_cuda_dependencies, nvidia_driver_available
 from .errors import ListenKitError, RuntimeHealthError
 from .health import EXPECTED_FASTER_WHISPER, inspect_runtime, python_is_314
 from .platform_paths import default_runtime_dir, platform_id, runtime_python_path
@@ -17,6 +19,14 @@ from .platform_paths import default_runtime_dir, platform_id, runtime_python_pat
 class PythonCommand:
     executable: str
     prefix_arguments: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RuntimeAcceleration:
+    backend: str
+    ready: bool
+    preparation_attempted: bool
+    message: str
 
 
 def repository_root() -> Path:
@@ -93,6 +103,7 @@ def initialize_runtime(
     platform: str | None = None,
     environment: Mapping[str, str] | None = None,
     force_repair: bool = False,
+    require_cuda: bool = False,
 ) -> Path:
     env = dict(os.environ if environment is None else environment)
     target_dir = runtime_dir or default_runtime_dir(platform=platform, environment=env)
@@ -102,6 +113,7 @@ def initialize_runtime(
         )
     executable = runtime_python_path(target_dir, platform=platform)
 
+    runtime_is_healthy = False
     if executable.is_file():
         if not python_is_314(executable):
             raise RuntimeHealthError(
@@ -110,10 +122,10 @@ def initialize_runtime(
         if not force_repair:
             try:
                 inspect_runtime(executable, environment=env)
-                return executable
+                runtime_is_healthy = True
             except RuntimeHealthError:
                 pass
-    else:
+    if not executable.is_file():
         bootstrap = find_bootstrap_python314(platform=platform, environment=env)
         target_dir.parent.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(
@@ -129,18 +141,103 @@ def initialize_runtime(
         if result.returncode != 0:
             raise ListenKitError(f"Failed to create ListenKit runtime at: {target_dir}")
 
-    requirements = repository_root() / "requirements-faster-whisper.txt"
-    for arguments, description in (
-        (["-m", "pip", "install", "--upgrade", "pip"], "upgrade pip"),
-        (["-m", "pip", "install", "-r", str(requirements)], "install requirements"),
-    ):
-        result = subprocess.run([str(executable), *arguments], check=False)
-        if result.returncode != 0:
-            raise ListenKitError(f"Failed to {description} in: {executable}")
+    if not runtime_is_healthy:
+        requirements = repository_root() / "requirements-faster-whisper.txt"
+        for arguments, description in (
+            (["-m", "pip", "install", "--upgrade", "pip"], "upgrade pip"),
+            (["-m", "pip", "install", "-r", str(requirements)], "install requirements"),
+        ):
+            result = subprocess.run([str(executable), *arguments], check=False)
+            if result.returncode != 0:
+                raise ListenKitError(f"Failed to {description} in: {executable}")
 
     metadata = inspect_runtime(executable, environment=env)
     if metadata.faster_whisper_version != EXPECTED_FASTER_WHISPER:
         raise RuntimeHealthError(
             f"ListenKit requires faster-whisper {EXPECTED_FASTER_WHISPER}: {executable}"
         )
+    prepare_runtime_acceleration(
+        executable,
+        platform=platform,
+        environment=env,
+        require_cuda=require_cuda,
+    )
     return executable
+
+
+def prepare_runtime_acceleration(
+    executable: Path,
+    *,
+    platform: str | None = None,
+    environment: Mapping[str, str] | None = None,
+    require_cuda: bool = False,
+) -> RuntimeAcceleration:
+    env = dict(os.environ if environment is None else environment)
+    current_platform = platform_id(platform)
+    if current_platform == "macos":
+        return RuntimeAcceleration(
+            backend="apple-accelerate",
+            ready=True,
+            preparation_attempted=False,
+            message=(
+                "CTranslate2 uses its Apple Accelerate CPU backend; its macOS wheel "
+                "does not provide a Metal/MPS GPU backend"
+            ),
+        )
+    if current_platform not in {"windows", "linux"}:
+        return RuntimeAcceleration(
+            backend="cpu",
+            ready=True,
+            preparation_attempted=False,
+            message="No managed GPU backend is available on this platform",
+        )
+    if not nvidia_driver_available(env):
+        if require_cuda:
+            raise ListenKitError("CUDA was requested, but no NVIDIA GPU driver was detected.")
+        return RuntimeAcceleration(
+            backend="cpu",
+            ready=True,
+            preparation_attempted=False,
+            message="No NVIDIA GPU driver was detected",
+        )
+
+    initial_probe = probe_cuda_devices(executable, environment=env)
+    if _cuda_probe_ready(initial_probe):
+        return RuntimeAcceleration(
+            backend="cuda",
+            ready=True,
+            preparation_attempted=False,
+            message="CUDA runtime is already ready",
+        )
+
+    installation = install_managed_cuda_dependencies(executable, environment=env)
+    final_probe = (
+        probe_cuda_devices(executable, environment=env)
+        if installation.succeeded
+        else initial_probe
+    )
+    if _cuda_probe_ready(final_probe):
+        return RuntimeAcceleration(
+            backend="cuda",
+            ready=True,
+            preparation_attempted=installation.attempted,
+            message="Managed CUDA runtime is ready",
+        )
+
+    detail = final_probe.error or installation.message or "CUDA probe found no device"
+    if require_cuda:
+        raise ListenKitError(f"CUDA preparation failed: {detail}")
+    print(
+        f"ListenKit warning: NVIDIA GPU detected, but CUDA preparation did not complete: {detail}",
+        file=sys.stderr,
+    )
+    return RuntimeAcceleration(
+        backend="cuda",
+        ready=False,
+        preparation_attempted=installation.attempted,
+        message=detail,
+    )
+
+
+def _cuda_probe_ready(probe: CudaProbe) -> bool:
+    return bool(probe.devices) and not probe.error
