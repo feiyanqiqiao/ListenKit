@@ -94,13 +94,20 @@ class PosixEntrypointTests(unittest.TestCase):
             self.assertEqual(payload["command"], "generate-markdown")
 
     @unittest.skipUnless(sys.platform == "darwin", "Homebrew fallback is macOS-specific")
-    def test_non_login_path_adds_homebrew_tools(self) -> None:
+    def test_non_login_path_adds_existing_homebrew_prefixes(self) -> None:
+        expected_prefixes = [
+            str(path)
+            for path in (Path("/opt/homebrew/bin"), Path("/usr/local/bin"))
+            if path.is_dir()
+        ]
+        if not expected_prefixes:
+            self.skipTest("no standard Homebrew prefix exists on this runner")
         result = subprocess.run(
             [
                 "/bin/bash",
                 "-c",
-                'source cli/_common.sh; listenkit_prepare_posix_environment; '
-                'command -v ffmpeg; command -v yt-dlp',
+                "source cli/_common.sh; listenkit_prepare_posix_environment; "
+                "printf '%s\\n' \"$PATH\"",
             ],
             cwd=REPO_ROOT,
             check=False,
@@ -110,8 +117,10 @@ class PosixEntrypointTests(unittest.TestCase):
             env=self.poisoned_environment(),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("/opt/homebrew/bin/ffmpeg", result.stdout)
-        self.assertIn("/opt/homebrew/bin/yt-dlp", result.stdout)
+        actual_path = result.stdout.strip().split(os.pathsep)
+        for prefix in expected_prefixes:
+            with self.subTest(prefix=prefix):
+                self.assertIn(prefix, actual_path)
 
 
 if __name__ == "__main__":
