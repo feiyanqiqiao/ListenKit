@@ -13,6 +13,10 @@ Use this skill when the user wants ListenKit to produce transcript artifacts fro
 2. Choose the output Markdown path and user-facing language label.
 3. Run the shared programmatic entrypoint once: `python -m listenkit_cli generate-markdown` from the repository root. If the host Python environment is uncertain, use `cli/listenkit.sh generate-markdown` on macOS/Linux/WSL or `.\cli\listenkit.ps1 generate-markdown` on native Windows.
 
+Git Bash, MSYS2, and Cygwin are native Windows rather than WSL. The `.sh`
+entrypoints exit 64 there; use the Python or PowerShell dispatcher and consume
+`--report-json` when stdout capture is unreliable.
+
 The wrapper derives the ASR locale from `--language`. For URL input, it defaults the Markdown title to the video's platform title when available; for local input, it derives the title from the source filename. Use optional `--locale` or `--title` only when the user needs an override.
 
 For `--output work/name.md`, the wrapper writes both `work/name.md` and `work/name.json`. Use the Markdown for readable transcript output and the JSON for downstream structured transformations.

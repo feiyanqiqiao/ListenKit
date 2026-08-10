@@ -13,7 +13,8 @@ Do not duplicate business logic inside editor rules.
 
 Use `--report-json` when the calling host needs file-based execution status.
 Select `.sh` for macOS/Linux/WSL and `.ps1` for native Windows; Git Bash is not
-WSL, and WSL must not be used as a transparent wrapper for Windows paths.
+WSL, and WSL must not be used as a transparent wrapper for Windows paths. The
+`.sh` entrypoints exit 64 in Git Bash/MSYS2/Cygwin; use Python or PowerShell.
 
 Leave ASR engine and device selection on their automatic defaults. Do not force CPU unless the user explicitly requests reproducible CPU execution.
 

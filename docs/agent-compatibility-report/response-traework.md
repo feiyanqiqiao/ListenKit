@@ -25,3 +25,22 @@ cli/listenkit.sh generate-markdown ... --report-json work/run.json --auto-init
 - Python 核心在报告时其实已有部分环境隔离；真实缺口主要在未覆盖的子进程和 `.sh` 壳层，本轮已统一收口。
 - Swift `macos26.0` target 是 API 下限，不应动态改为宿主版本。
 - Windows Python 发现、Store alias 和 PowerShell 5.1 仍需 Windows Codex 实机完成；本轮没有用 macOS 测试冒充完成。
+
+## Windows Codex 补充（2026-08-10）
+
+Windows 实机补测发现同类缺口确实存在于 `listenkit.ps1`：它原先在 Python
+探针前没有移除 `PYTHONHOME`，注入无效值会直接触发 `Failed to import
+encodings module`。现在分发器在探针和运行期间都隔离
+`PYTHONHOME/PYTHONPATH`，结束后恢复；PowerShell 5.1/7 的污染环境回归均
+通过。
+
+此外已完成：
+
+- 受限 PATH 下从托管 venv、winget Python、Program Files 自动发现；
+- 直接 Python 与 PowerShell 输出统一 UTF-8；
+- System32 `nvidia-smi` 和 WinGet Links 工具 fallback；
+- ExecutionPolicy Bypass 文档与实测；
+- 真实 CUDA、真实 CPU fallback、显式 CUDA 严格失败。
+
+TraeWork 无需设置项目内补丁；标准调用仍是 Python/PowerShell 公共入口加
+`--report-json`。LingoTrace 的 `/bin/bash` 问题继续由上游负责。

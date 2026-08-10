@@ -27,7 +27,10 @@ winget install Gyan.FFmpeg
 .\cli\listenkit.ps1 generate-markdown --url "https://example.com/video" --language Japanese --output work\sample.md --report-json work\sample.execution.json --auto-init
 ```
 
-Windows 流程是原生 PowerShell 实现，不依赖 Bash、WSL、Git Bash 或 MSYS2。如果脚本执行策略受限，可使用 `powershell -NoProfile -ExecutionPolicy Bypass -File .\cli\listenkit.ps1 generate-markdown ...`。
+Windows 流程是原生 PowerShell 实现，不依赖 Bash、WSL、Git Bash 或 MSYS2。
+POSIX `.sh` 入口在 Git Bash/MSYS2/Cygwin 中会主动以退出码 64 拒绝；请使用
+Python 或 PowerShell 分发器。如果脚本执行策略受限，可使用
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\cli\listenkit.ps1 generate-markdown ...`。
 
 默认 ASR 策略会优先准备和使用硬件加速：
 

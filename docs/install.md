@@ -18,7 +18,9 @@ winget install yt-dlp.yt-dlp
 winget install Gyan.FFmpeg
 ```
 
-Restart the terminal after installation, then run `.\cli\doctor.ps1`. ListenKit checks `yt-dlp.exe` and `ffmpeg.exe` on `PATH`; it does not silently install system packages.
+Restart the terminal after installation, then run `.\cli\doctor.ps1`. ListenKit
+checks `PATH` first and also recognizes `yt-dlp.exe`/`ffmpeg.exe` in the standard
+WinGet Links directory. It does not silently install system packages.
 
 Python 3.14 is required for the faster-whisper runtime. On macOS, Homebrew Python 3.14 is the supported bootstrap Python. Other lightweight maintenance scripts remain compatible with Python 3.10+.
 
@@ -30,10 +32,33 @@ wrappers remove those Python variables before launching ListenKit, force UTF-8
 I/O, and on macOS probe the standard Apple Silicon and Intel Homebrew prefixes.
 They do not change the parent Agent environment.
 
+The native Windows dispatcher provides the same isolation. It removes inherited
+`PYTHONHOME`/`PYTHONPATH` before probing Python, uses UTF-8 stdout/stderr, and
+restores the caller's environment when it exits. Git Bash, MSYS2, and Cygwin are
+native Windows environments: their `.sh` entrypoints intentionally exit 64.
+Use `python -m listenkit_cli` or PowerShell there.
+
 If a compatible CLI Python is installed outside `PATH`, select it explicitly:
 
 ```bash
 LISTENKIT_CLI_PYTHON=/path/to/python3 cli/listenkit.sh doctor
+```
+
+In PowerShell:
+
+```powershell
+$env:LISTENKIT_CLI_PYTHON = "$env:LOCALAPPDATA\Programs\Python\Python314\python.exe"
+.\cli\listenkit.ps1 doctor
+```
+
+Without an override, the Windows dispatcher tries the managed runtime, the
+standard per-user and Program Files Python 3.14 locations, then `py -3.14`,
+`python3.14`, and `python`. Every candidate must pass a real version probe, so a
+Microsoft Store alias or an unusable stub is skipped. If the execution policy is
+restricted, use:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\cli\listenkit.ps1 doctor
 ```
 
 The CLI host needs Python 3.10+; the managed ASR runtime remains pinned to
@@ -96,7 +121,10 @@ Windows PowerShell has native initialization, health-check, diagnosis, and compl
 .\cli\listenkit.ps1 generate-markdown --input "C:\Media\sample.m4a" --language English --output work\sample.md --report-json work\sample.execution.json --auto-init --device auto
 ```
 
-The Windows entrypoints support Windows PowerShell 5.1 and PowerShell 7 and run through the shared cross-platform Python core. They do not require Bash or WSL. Apple Speech remains macOS-only; Windows uses faster-whisper.
+The Windows entrypoints support Windows PowerShell 5.1 and PowerShell 7 and run
+through the shared cross-platform Python core. They do not require Bash, Git
+Bash, MSYS2, Cygwin, or WSL. Apple Speech remains macOS-only; Windows uses
+faster-whisper.
 
 Do not initialize with `python3 -m venv .venv` in the repository. Use the ListenKit initializer so the native runtime remains outside iCloud and uses the supported Python version.
 

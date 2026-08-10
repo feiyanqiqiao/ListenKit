@@ -29,3 +29,18 @@ python -m listenkit_cli generate-markdown \
 ```
 
 Windows 上的 Python 发现、Store alias、PowerShell 和 Git Bash 政策已列入 Windows 交接，等待原生实机完成。
+
+## Windows Codex 补充（2026-08-10）
+
+上述待办已完成。Windows 分发器现在在受限 PATH 下优先复用健康托管
+runtime，并识别 winget/Program Files Python；所有候选必须通过真实版本
+探针。Git Bash/MSYS2/Cygwin 的 `.sh` 入口退出 64，公共契约明确要求使用
+跨平台 Python 模块或 PowerShell。
+
+真实 E2E 证明：含中文和空格的 SAPI WAV 经 PowerShell 公共入口完成
+GTX 1660 SUPER/CUDA float16 转写；execution report 记录实际 backend。
+制造 CUDA 失败后，自动模式完成真实 CPU INT8 转写并记录两次 CUDA 尝试，
+显式 CUDA 不降级。缺文件的中文/日文/emoji 错误也原子写入 UTF-8 report。
+
+LingoTrace 的 `/bin/bash` 和入口选择仍应在 LingoTrace 修复；ListenKit 没有
+增加上游发现或绕行逻辑。

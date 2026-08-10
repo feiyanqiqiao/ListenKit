@@ -4,6 +4,15 @@
 # Bash 3.2 shipped by macOS.
 
 listenkit_prepare_posix_environment() {
+  case "$(uname -s 2>/dev/null || true)" in
+    MINGW*|MSYS*|CYGWIN*)
+      echo "ListenKit .sh entrypoints are not supported in Git Bash, MSYS2, or Cygwin." >&2
+      echo "Use the cross-platform Python CLI: python -m listenkit_cli <command>" >&2
+      echo "Or use native PowerShell: powershell -NoProfile -ExecutionPolicy Bypass -File .\\cli\\listenkit.ps1 <command>" >&2
+      return 64
+      ;;
+  esac
+
   unset PYTHONHOME
   unset PYTHONPATH
   export PYTHONUTF8=1

@@ -183,3 +183,136 @@ Windows 阶段应做明确决策并测试：
 - Git Bash 行为明确且不会误导；
 - 更新本交接文档的结果区，列出确切命令、版本、设备和未完成边界；
 - 重新跑跨平台 CI 后再提交或发 PR。
+
+## 6. Windows 阶段完成结果（2026-08-10）
+
+### 6.1 GitHub 与本地基线
+
+- GitHub `origin/codex/agent-compatibility-hardening` 经独立克隆和
+  `git ls-remote` 核验为 `03fb5e47cf7ccb92cc9efc2a3c7fb35e537ce164`。
+- 原本地分支停在 `c23f0a8` 且有未提交的 macOS 工作副本。对齐前内容已
+  保存为 `stash@{0}: pre-windows-github-authoritative-sync-2026-08-10`，随后
+  当前分支对齐到 GitHub 提交 `03fb5e4` 再开始 Windows 修改。
+- 本地 `.git/refs` 中 3 个全零 SHA 的超长 checkpoint ref 与一个
+  `.DS_Store` 已确认无效并删除；`git fsck --full --no-reflogs` 现退出 0，
+  只报告可接受的 dangling objects。
+- 清理后再次 `git fetch origin --prune` 不再出现 `bad object`，但连续两次
+  遇到外部 Schannel TLS handshake 失败；本轮远端权威提交已在此前成功
+  克隆时确认，不把该网络故障当成代码失败。
+
+### 6.2 已实施能力
+
+1. `cli/listenkit.ps1`
+   - 在 Python 探针前移除宿主 `PYTHONHOME/PYTHONPATH`，CLI 运行时只注入
+     仓库根 `PYTHONPATH`，结束后恢复调用方环境；
+   - PowerShell/Console 与 Python I/O 使用无 BOM UTF-8，结束后恢复；
+   - 候选顺序为显式 `LISTENKIT_CLI_PYTHON`、托管 runtime、用户级
+     Python314、Program Files Python314、`py -3.14`、`python3.14`、
+     `python`；
+   - 所有候选真实运行 Python 3.10+ 探针，启动异常/Store alias 会被跳过；
+   - 错误信息区分 CLI host 3.10+ 与 managed ASR runtime 3.14。
+2. `listenkit_cli/runtime.py`
+   - Windows bootstrap 加入 winget/Program Files Python 3.14 常见位置；
+   - 不可执行 alias 的 `OSError` 不再中断后续候选。
+3. `listenkit_cli/process.py`、`cuda_runtime.py`、`asr_device.py`
+   - 受限 PATH 时 fallback 到 `%SystemRoot%\\System32\\nvidia-smi.exe`；
+   - fallback 到 `%LOCALAPPDATA%\\Microsoft\\WinGet\\Links` 的
+     ffmpeg/ffprobe/yt-dlp；
+   - driver 与设备元数据查询统一使用调用方传入 environment。
+4. `listenkit_cli/__main__.py`
+   - 直接 `python -m listenkit_cli` 的 stdout/stderr 主动重配置为 UTF-8。
+5. `cli/_common.sh`
+   - Git Bash/MSYS2/Cygwin 原生 Windows 快速退出 64，并提示 Python 与
+     PowerShell 公共入口；WSL/Linux/macOS 不受影响。
+6. README、安装文档、LLM 契约与通用/Codex/Claude/Cursor adapter 已同步。
+7. 完整方案保存在 `windows-compatibility-hardening-plan.md`。
+
+### 6.3 自动化验证
+
+```text
+python -m compileall -q listenkit_cli cli tools tests
+OK
+
+python -m unittest discover -s tests -v
+Ran 153 tests in 67.507s
+OK (skipped=76)
+
+git diff --check
+OK（仅 core.autocrlf 的 LF→CRLF 提示）
+```
+
+新增 Windows 实测覆盖：
+
+- PowerShell 5.1 与 7 公共帮助、doctor、真实临时 runtime；
+- 无效 `PYTHONHOME/PYTHONPATH` 下解释器探针和运行；
+- 受限 PATH 下自动发现含中文/空格路径的 managed venv；
+- 直接 Python 与两个 PowerShell 宿主的中文/日文/emoji stderr 严格 UTF-8；
+- Git for Windows bash 的 `.sh` 入口退出 64；
+- System32/WinGet Links 工具 fallback；
+- 常见 Python 3.14 bootstrap 候选和不可执行 alias。
+
+`python -m pytest -q` 未运行，因为本机系统 Python 3.14.4 没有安装
+pytest（`No module named pytest`）；没有为此修改项目依赖或联网安装。
+unittest 是本仓库当前可用的完整测试入口。
+
+### 6.4 Windows 真实设备 E2E
+
+环境：
+
+```text
+Windows 11 10.0.26220 / AMD64
+Windows PowerShell 5.1.26100.9022
+PowerShell 7.6.4
+Python 3.14.4
+faster-whisper 1.2.1
+NVIDIA GeForce GTX 1660 SUPER / compute capability 7.5 / 6144 MiB
+NVIDIA driver 581.80
+```
+
+输入为 Windows SAPI 生成的短英语 WAV：
+`work\\Windows 兼容性验收\\SAPI 样本 audio.wav`。
+
+正常 CUDA（PowerShell 5.1 公共入口）：
+
+```text
+status=ok
+engine=faster-whisper
+device=cuda
+device_index=0
+device_name=NVIDIA GeForce GTX 1660 SUPER
+compute_type=float16
+timing_complete=true
+duration_seconds=5.332922
+```
+
+制造 CUDA 失败后的真实 CPU fallback（PowerShell 7 公共入口）：
+
+```text
+status=ok
+device=cpu
+compute_type=int8
+fallback_from=[cuda/float16, cuda/int8_float16]
+device_selection_reason=CPU fallback after CUDA failure
+真实 faster-whisper CPU 转写文本与 CUDA 结果一致
+```
+
+同一故障下显式 `--device cuda`：退出 1，execution report
+`status=error`，未生成 Markdown/transcript，确认没有静默 CPU fallback。
+
+### 6.5 execution report 与路径安全
+
+- 成功 CUDA、成功 CPU fallback 均写入实际 backend/device/compute/fallback；
+- 缺失输入路径含中文、日文、emoji 时退出 1，error report 保留原始 UTF-8；
+- report 与 Markdown 使用同一路径时在工作流前拒绝；原 Markdown 的
+  SHA-256 前后均为
+  `F09BB513B8BA8F2BE52A37082B6503093628CF73F4E8DF8D6B1293350809CA5F`；
+- 显式 CUDA 失败没有伪成功产物。
+
+### 6.6 仍然明确不在本阶段声称的范围
+
+- 未修改或验收 LingoTrace 的 Windows `/bin/bash`/入口选择；属上游仓库。
+- 未在本轮 Windows 机器重跑 macOS Apple Speech/MLX；沿用 macOS 阶段证据。
+- 未新增 WorkBuddy/TraeWork/QwenWork/Antigravity adapter；公共契约、UTF-8
+  和 report 是项目级兼容方案。
+- 当前 Windows 修改尚未推送；外部写入需由用户另行授权。推送后才可用
+  GitHub Actions 对本提交重新跑跨平台 CI。

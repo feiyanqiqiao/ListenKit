@@ -10,7 +10,9 @@ Choose the entrypoint from the current operating environment:
 
 The existing `cli/generate-markdown.sh` and `.\cli\generate-markdown.ps1`
 convenience wrappers remain supported. Do not send native Windows through WSL;
-Git Bash is not WSL, and WSL has a different filesystem and ASR runtime.
+Git Bash is not WSL, and WSL has a different filesystem and ASR runtime. The
+`.sh` entrypoints intentionally exit 64 in Git Bash/MSYS2/Cygwin; use the Python
+or PowerShell dispatcher there.
 
 ## Normal Workflow
 
@@ -46,6 +48,9 @@ Rules:
   file for status, artifact paths, actual backend metadata, and errors.
 - Do not patch this repository to compensate for a host Agent's PATH, shell, or
   stdout-capture limitation. Use the Python/platform dispatcher and report file.
+- On Windows, set `LISTENKIT_CLI_PYTHON` only when automatic discovery cannot
+  use the managed runtime or standard Python 3.14 install locations. The CLI
+  host accepts Python 3.10+; ASR runtime creation remains pinned to Python 3.14.
 - Entry points are non-interactive by default. Use `--auto-init` to authorize
   runtime preparation; never wait on an implicit terminal prompt.
 - If the user does not specify an output path, prefer `work/<safe-source-stem>-transcript.md`; if no stable source stem is available, use `work/transcript.md`.

@@ -22,3 +22,20 @@ python -m listenkit_cli generate-markdown ... --report-json work/run.json --auto
 ```
 
 macOS/Linux/WSL 宿主 Python 不可靠时使用 `cli/listenkit.sh generate-markdown`；原生 Windows 使用 `.\cli\listenkit.ps1 generate-markdown`。
+
+## Windows Codex 补充（2026-08-10）
+
+Windows 实机证据确认了你的编码判断：在未设置 Python 编码环境变量时，
+Python 3.14.4 的捕获型 stdout/stderr 是 `gbk`，`utf8_mode=0`。因此现在
+`python -m listenkit_cli` 会在模块入口将两个流重配置为 UTF-8；PowerShell
+分发器也设置 UTF-8，并在结束时恢复调用方编码状态。含中文、日文和 emoji
+的错误路径已经通过字节级严格 UTF-8 解码测试。
+
+同时完成：
+
+- PowerShell 5.1/7 分发器在解释器探针前清理 `PYTHONHOME/PYTHONPATH`；
+- 受限 PATH 下可从托管 venv、winget Python 和 Program Files 发现 CLI host；
+- doctor 可从 System32/WinGet Links fallback 发现 NVIDIA 与媒体工具；
+- `--report-json` 的成功、错误、路径冲突、CUDA fallback 均已实机验证。
+
+结论不变：无需 `adapters/antigravity/`，这些兼容能力由公共入口提供。

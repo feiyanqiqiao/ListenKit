@@ -32,3 +32,6 @@ Do not call lower-level import, subtitle extraction, ASR, rendering, raw downloa
 Keep the output to transcript JSON or plain transcript Markdown. Do not add learning-note templates, Obsidian-only syntax, Anki cards, or review scheduling unless a downstream project explicitly requests that transformation.
 
 The Windows command accepts the same flags and produces the same output pair. Native Windows must not be routed through WSL because its runtime and paths are separate.
+Git Bash/MSYS2/Cygwin are native Windows and the `.sh` entrypoints exit 64 there;
+use the Python or PowerShell dispatcher. Prefer `--report-json` over modifying
+ListenKit for host PATH, shell, or stdout-capture limitations.

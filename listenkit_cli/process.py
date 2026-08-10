@@ -25,6 +25,34 @@ def find_command(
             candidate = prefix / name
             if candidate.is_file() and os.access(candidate, os.X_OK):
                 return str(candidate)
+    if platform_id(platform) == "windows" and os.path.dirname(name) == "":
+        normalized = name.casefold()
+        if normalized in {"nvidia-smi", "nvidia-smi.exe"}:
+            system_root = env.get("SystemRoot") or env.get("SYSTEMROOT")
+            if system_root:
+                candidate = Path(system_root) / "System32" / "nvidia-smi.exe"
+                if candidate.is_file():
+                    return str(candidate)
+        executable_names = {
+            "ffmpeg": "ffmpeg.exe",
+            "ffmpeg.exe": "ffmpeg.exe",
+            "ffprobe": "ffprobe.exe",
+            "ffprobe.exe": "ffprobe.exe",
+            "yt-dlp": "yt-dlp.exe",
+            "yt-dlp.exe": "yt-dlp.exe",
+        }
+        executable_name = executable_names.get(normalized)
+        local_app_data = env.get("LOCALAPPDATA")
+        if executable_name and local_app_data:
+            candidate = (
+                Path(local_app_data)
+                / "Microsoft"
+                / "WinGet"
+                / "Links"
+                / executable_name
+            )
+            if candidate.is_file():
+                return str(candidate)
     return None
 
 

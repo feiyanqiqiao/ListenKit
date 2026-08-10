@@ -75,9 +75,19 @@ On native Windows, use the matching PowerShell dispatcher:
 `cli/generate-markdown.sh` and `.\cli\generate-markdown.ps1` remain supported
 high-level convenience wrappers. Use `.sh` only on macOS/Linux/WSL and `.ps1`
 on native Windows. Git Bash, MSYS2, and Cygwin are native Windows environments,
-not WSL; use the Python CLI or PowerShell dispatcher there. Do not route native
-Windows through WSL because WSL has a separate filesystem, runtime path, and
-dependency environment.
+not WSL; the `.sh` entrypoints fail fast there with exit 64. Use the Python CLI
+or PowerShell dispatcher instead. Do not route native Windows through WSL
+because WSL has a separate filesystem, runtime path, and dependency environment.
+If script execution is restricted, invoke the dispatcher with
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\cli\listenkit.ps1 ...`.
+
+The Windows dispatcher removes inherited `PYTHONHOME` and `PYTHONPATH`, uses
+UTF-8 I/O, and probes each interpreter by running it. Its automatic order is an
+explicit `LISTENKIT_CLI_PYTHON`, the managed runtime, the standard per-user and
+Program Files Python 3.14 locations, then `py -3.14`, `python3.14`, and `python`.
+The CLI host needs Python 3.10+; creating or repairing the managed ASR runtime
+still requires a genuine Python 3.14 interpreter. Direct `python -m listenkit_cli`
+also configures its public stdout and stderr streams as UTF-8 on Windows.
 
 For local media, replace `--url <url>` with `--input <path>`.
 

@@ -27,7 +27,10 @@ winget install Gyan.FFmpeg
 .\cli\listenkit.ps1 generate-markdown --url "https://example.com/video" --language Japanese --output work\sample.md --report-json work\sample.execution.json --auto-init
 ```
 
-The Windows workflow is native: it does not require Bash, WSL, Git Bash, or MSYS2. If script execution is restricted, run `powershell -NoProfile -ExecutionPolicy Bypass -File .\cli\listenkit.ps1 generate-markdown ...`.
+The Windows workflow is native: it does not require Bash, WSL, Git Bash, or
+MSYS2. POSIX `.sh` entrypoints intentionally exit 64 in Git Bash/MSYS2/Cygwin;
+use the Python or PowerShell dispatcher. If script execution is restricted, run
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\cli\listenkit.ps1 generate-markdown ...`.
 
 ASR defaults to acceleration-first execution. On Apple Silicon macOS, ListenKit
 prepares MLX Whisper and selects the Metal GPU. On Windows and Linux, it detects
