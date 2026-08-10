@@ -1,14 +1,18 @@
 # ListenKit
 
-Use the repository CLI. Do not reimplement the pipeline in prompt text. Use `cli/generate-markdown.sh` on macOS/Linux/WSL and `.\cli\generate-markdown.ps1` on native Windows.
+Use the repository CLI. Do not reimplement the pipeline in prompt text. Prefer
+`python -m listenkit_cli generate-markdown` from the repository root. When the
+host Python environment is uncertain, use `cli/listenkit.sh generate-markdown`
+on macOS/Linux/WSL or `.\cli\listenkit.ps1 generate-markdown` on native Windows.
 
 Normal workflow:
 
 ```bash
-cli/generate-markdown.sh \
+cli/listenkit.sh generate-markdown \
   --url <url> \
   --language <label> \
   --output <md> \
+  --report-json <execution-json> \
   --auto-init
 ```
 
@@ -17,6 +21,9 @@ The high-level command also accepts `--input <path>` as the single input source.
 Leave ASR engine and device selection on their automatic defaults. Do not force CPU unless the user explicitly requests reproducible CPU execution.
 
 For `--output path/name.md`, consume `path/name.md` as the readable transcript and `path/name.json` as the structured transcript artifact.
+Read the optional execution report for status and backend diagnostics when
+stdout capture is unreliable. Do not modify ListenKit to work around Claude
+host PATH or shell limitations.
 
 For URL input, the high-level command tries platform subtitles first and still attempts to import local audio. If subtitles are unavailable, it falls back to imported audio plus ASR.
 

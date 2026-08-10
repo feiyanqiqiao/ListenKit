@@ -132,6 +132,7 @@ def probe_cuda_devices(
             environment=env,
             timeout=CUDA_PROBE_TIMEOUT_SECONDS,
             check=False,
+            isolate_python=True,
         )
     except CommandExecutionError as exc:
         return CudaProbe((), str(exc))

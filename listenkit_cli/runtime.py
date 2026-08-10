@@ -18,6 +18,7 @@ from .mlx_runtime import (
     probe_mlx_runtime,
 )
 from .platform_paths import default_runtime_dir, platform_id, runtime_python_path
+from .process import isolated_python_environment
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,11 @@ def _resolve_command(command: PythonCommand) -> PythonCommand | None:
     return PythonCommand(resolved, command.prefix_arguments)
 
 
-def _command_is_python314(command: PythonCommand) -> bool:
+def _command_is_python314(
+    command: PythonCommand,
+    *,
+    environment: Mapping[str, str] | None = None,
+) -> bool:
     result = subprocess.run(
         [
             command.executable,
@@ -83,6 +88,7 @@ def _command_is_python314(command: PythonCommand) -> bool:
             "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 14) else 1)",
         ],
         check=False,
+        env=isolated_python_environment(environment),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -94,7 +100,7 @@ def find_bootstrap_python314(
 ) -> PythonCommand:
     for candidate in _candidate_commands(platform=platform, environment=environment):
         resolved = _resolve_command(candidate)
-        if resolved and _command_is_python314(resolved):
+        if resolved and _command_is_python314(resolved, environment=environment):
             return resolved
     raise ListenKitError(
         "Python 3.14 is required. Install it or set "
@@ -144,6 +150,7 @@ def initialize_runtime(
                 str(target_dir),
             ],
             check=False,
+            env=isolated_python_environment(env),
         )
         if result.returncode != 0:
             raise ListenKitError(f"Failed to create ListenKit runtime at: {target_dir}")
@@ -154,7 +161,11 @@ def initialize_runtime(
             (["-m", "pip", "install", "--upgrade", "pip"], "upgrade pip"),
             (["-m", "pip", "install", "-r", str(requirements)], "install requirements"),
         ):
-            result = subprocess.run([str(executable), *arguments], check=False)
+            result = subprocess.run(
+                [str(executable), *arguments],
+                check=False,
+                env=isolated_python_environment(env),
+            )
             if result.returncode != 0:
                 raise ListenKitError(f"Failed to {description} in: {executable}")
 

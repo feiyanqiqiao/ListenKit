@@ -7,10 +7,25 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 from .errors import CommandExecutionError, CommandNotFoundError
+from .platform_paths import platform_id
 
 
-def find_command(name: str) -> str | None:
-    return shutil.which(name)
+def find_command(
+    name: str,
+    *,
+    environment: Mapping[str, str] | None = None,
+    platform: str | None = None,
+) -> str | None:
+    env = os.environ if environment is None else environment
+    resolved = shutil.which(name, path=env.get("PATH", ""))
+    if resolved:
+        return resolved
+    if platform_id(platform) == "macos" and os.path.dirname(name) == "":
+        for prefix in (Path("/opt/homebrew/bin"), Path("/usr/local/bin")):
+            candidate = prefix / name
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return str(candidate)
+    return None
 
 
 def require_command(name: str) -> str:
@@ -31,9 +46,14 @@ def run_command(
     timeout: int | float | None = None,
     check: bool = True,
     capture: bool = True,
+    isolate_python: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     command = [os.fspath(value) for value in args]
-    child_environment = dict(os.environ if environment is None else environment)
+    child_environment = (
+        isolated_python_environment(environment)
+        if isolate_python
+        else dict(os.environ if environment is None else environment)
+    )
     child_environment.setdefault("PYTHONUTF8", "1")
     child_environment.setdefault("PYTHONIOENCODING", "utf-8")
     try:
@@ -65,6 +85,17 @@ def run_command(
             message = f"{message}\n{stderr}"
         raise CommandExecutionError(message, returncode=result.returncode, stderr=stderr)
     return result
+
+
+def isolated_python_environment(
+    environment: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    child_environment = dict(os.environ if environment is None else environment)
+    child_environment.pop("PYTHONHOME", None)
+    child_environment.pop("PYTHONPATH", None)
+    child_environment.setdefault("PYTHONUTF8", "1")
+    child_environment.setdefault("PYTHONIOENCODING", "utf-8")
+    return child_environment
 
 
 def _coerce_text(value: str | bytes | None) -> str:

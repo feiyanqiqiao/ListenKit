@@ -69,6 +69,7 @@ def cuda_library_dirs(
             environment=env,
             timeout=20,
             check=False,
+            isolate_python=True,
         )
     except ListenKitError:
         return ()
@@ -127,6 +128,7 @@ def install_managed_cuda_dependencies(
         [python_executable, "-m", "pip", "install", "-r", requirements],
         environment=env,
         check=False,
+        isolate_python=True,
     )
     if result.stdout:
         print(result.stdout.rstrip(), file=sys.stderr)

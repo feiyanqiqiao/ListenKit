@@ -1,6 +1,6 @@
 # Install
 
-This document covers system dependencies, backend initialization, and troubleshooting. Normal users and external agents should run `cli/generate-markdown.sh` on macOS/Linux/WSL or `.\cli\generate-markdown.ps1` on native Windows. Lower-level commands are backend or debugging references, not the public agent entrypoint.
+This document covers system dependencies, backend initialization, and troubleshooting. External agents should run `python -m listenkit_cli generate-markdown` from the repository root, `cli/listenkit.sh generate-markdown` on macOS/Linux/WSL, or `.\cli\listenkit.ps1 generate-markdown` on native Windows. The older direct wrappers remain supported. Lower-level commands are backend or debugging references, not the public agent entrypoint.
 
 ## Dependencies
 
@@ -21,6 +21,26 @@ winget install Gyan.FFmpeg
 Restart the terminal after installation, then run `.\cli\doctor.ps1`. ListenKit checks `yt-dlp.exe` and `ffmpeg.exe` on `PATH`; it does not silently install system packages.
 
 Python 3.14 is required for the faster-whisper runtime. On macOS, Homebrew Python 3.14 is the supported bootstrap Python. Other lightweight maintenance scripts remain compatible with Python 3.10+.
+
+### Agent and non-login shell behavior
+
+Desktop Agents commonly inherit a reduced `PATH` or set `PYTHONHOME` and
+`PYTHONPATH` for their own embedded Python. `cli/listenkit.sh` and the POSIX
+wrappers remove those Python variables before launching ListenKit, force UTF-8
+I/O, and on macOS probe the standard Apple Silicon and Intel Homebrew prefixes.
+They do not change the parent Agent environment.
+
+If a compatible CLI Python is installed outside `PATH`, select it explicitly:
+
+```bash
+LISTENKIT_CLI_PYTHON=/path/to/python3 cli/listenkit.sh doctor
+```
+
+The CLI host needs Python 3.10+; the managed ASR runtime remains pinned to
+Python 3.14. A missing runtime never triggers an implicit prompt in automation.
+Pass `--auto-init` to authorize preparation. The lower-level Bash transcriber
+offers `--interactive-init` only for a human who explicitly wants a terminal
+confirmation.
 
 The default ASR environment is platform-specific:
 
@@ -73,7 +93,7 @@ Windows PowerShell has native initialization, health-check, diagnosis, and compl
 .\cli\init-faster-whisper.ps1
 .\cli\check-runtime.ps1
 .\cli\doctor.ps1
-.\cli\generate-markdown.ps1 --input "C:\Media\sample.m4a" --language English --output work\sample.md --auto-init --device auto
+.\cli\listenkit.ps1 generate-markdown --input "C:\Media\sample.m4a" --language English --output work\sample.md --report-json work\sample.execution.json --auto-init --device auto
 ```
 
 The Windows entrypoints support Windows PowerShell 5.1 and PowerShell 7 and run through the shared cross-platform Python core. They do not require Bash or WSL. Apple Speech remains macOS-only; Windows uses faster-whisper.

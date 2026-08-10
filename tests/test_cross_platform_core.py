@@ -30,7 +30,7 @@ from listenkit_cli.platform_paths import (
     huggingface_hub_cache_dir,
     runtime_python_path,
 )
-from listenkit_cli.process import run_command
+from listenkit_cli.process import isolated_python_environment, run_command
 from listenkit_cli.rendering import render_transcript
 from listenkit_cli.runtime import prepare_runtime_acceleration
 from listenkit_cli.subtitles import extract_subtitles, parse_vtt
@@ -109,6 +109,20 @@ class HealthContractTests(unittest.TestCase):
         )
         self.assertEqual(result.stdout.strip(), "路径 with spaces")
 
+    def test_isolated_python_environment_removes_agent_python_overrides(self) -> None:
+        isolated = isolated_python_environment(
+            {
+                "PATH": "tools",
+                "PYTHONHOME": "/agent/python",
+                "PYTHONPATH": "/agent/packages",
+            }
+        )
+        self.assertNotIn("PYTHONHOME", isolated)
+        self.assertNotIn("PYTHONPATH", isolated)
+        self.assertEqual(isolated["PATH"], "tools")
+        self.assertEqual(isolated["PYTHONUTF8"], "1")
+        self.assertEqual(isolated["PYTHONIOENCODING"], "utf-8")
+
     def test_faster_whisper_import_is_bounded(self) -> None:
         if sys.version_info[:2] < (3, 10):
             self.skipTest("requires venv-capable Python")
@@ -136,6 +150,21 @@ class HealthContractTests(unittest.TestCase):
                     },
                 )
             self.assertLess(time.monotonic() - started, 5)
+
+    def test_apple_backend_is_rejected_outside_macos(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio = Path(tmpdir) / "sample.wav"
+            audio.write_bytes(b"fake")
+            for simulated_platform in ("windows", "linux"):
+                with self.subTest(platform=simulated_platform), mock.patch(
+                    "listenkit_cli.transcription.platform_id",
+                    return_value=simulated_platform,
+                ), self.assertRaisesRegex(ListenKitError, "only on macOS"):
+                    transcribe_audio(
+                        audio_path=audio,
+                        locale="en-US",
+                        engine="apple",
+                    )
 
 
 class AccelerationPreparationTests(unittest.TestCase):
