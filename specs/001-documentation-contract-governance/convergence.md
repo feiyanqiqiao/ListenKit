@@ -22,7 +22,7 @@
 ## 任务收敛
 
 - T001-T027 已完成并在 `tasks.md` 标记为 `[x]`。
-- T028 已完成分支提交和推送；PR 创建动作仍需 GitHub API/CLI 凭据完成。
+- T028 已完成分支提交、推送和 PR 创建；PR 为 `feiyanqiqiao/ListenKit#8`。
 - 本地没有 CRITICAL、HIGH、MEDIUM 或 LOW 的实现缺口，因此不追加 Convergence phase。
 
 ## 已知限制
