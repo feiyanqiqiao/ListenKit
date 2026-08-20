@@ -16,6 +16,8 @@
 | 重复入口 | 检查 `README.zh-CN.md`、历史一键安装计划和权威契约引用 | 通过；重复镜像与过时计划已删除，内容已迁移 |
 | 应用行为 | `git diff main --` 与源代码范围审查 | 通过；没有应用源代码变更 |
 | 分支推送 | `git push -u origin codex/spec-kit-migration` | 通过；origin 已建立同名远程分支 |
+| 收敛补漏 | Windows 执行策略、安装器安全参数、终止型 error payload、版权边界和 Windows 入口审计 | 通过；T029-T033 已完成 |
+| PR 状态 | `gh pr view 8 --repo feiyanqiqiao/ListenKit` | 通过；PR #8 为 OPEN，目标为 `main`，后续提交继续推送到同一 PR |
 
 ## 需求覆盖
 
@@ -36,3 +38,4 @@
 - 本次验证在 macOS/Python 3.14.4 完成；Windows-only 测试按测试标记跳过。
 - CI 仍负责 macOS、Ubuntu、Windows 矩阵、Windows PowerShell 5.1/7 入口和 Windows 真实 faster-whisper runtime job。
 - Apple Speech 权限、Apple Silicon Metal 选择和真实 NVIDIA 设备声明未因本次文档迁移新增实机承诺；仍以对应设备验证为准。
+- 收敛复核确认没有剩余 CRITICAL、HIGH、MEDIUM 或 LOW 文档契约缺口；未新增应用源代码变更。

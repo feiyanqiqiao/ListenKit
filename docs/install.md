@@ -20,6 +20,8 @@ winget install Gyan.FFmpeg
 
 安装后重新打开终端并运行 `.\cli\doctor.ps1`。ListenKit 优先检查 `PATH`，也识别 WinGet Links 目录中的 `yt-dlp.exe` 和 `ffmpeg.exe`，不会静默安装系统软件包。
 
+如果 PowerShell 执行策略受限，使用 `powershell -NoProfile -ExecutionPolicy Bypass -File .\cli\listenkit.ps1 doctor`，或对 `generate-markdown` 传入相同的脚本参数。
+
 faster-whisper 运行时需要 Python 3.14；macOS 使用 Homebrew Python 3.14 作为受支持的 bootstrap Python。其它轻量维护脚本兼容 Python 3.10+。
 
 ## Agent 与非登录 shell

@@ -2,7 +2,7 @@
 
 仓库中的示例是合成数据，可以安全重新分发。
 
-仓库不附带音频文件。这些示例用于维护者测试渲染器，使用合成的 transcript JSON，不是外部集成入口。外部集成应使用 `cli/generate-markdown.sh`；详见 `LLM_INTEGRATION.md`。
+仓库不附带音频文件。这些示例用于维护者测试渲染器，使用合成的 transcript JSON，不是外部集成入口。外部集成应使用 `cli/listenkit.sh generate-markdown`；详见 `LLM_INTEGRATION.md`。
 
 ## 日语示例
 

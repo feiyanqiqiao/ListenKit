@@ -45,6 +45,8 @@ cli/listenkit.sh generate-markdown \
 - 入口默认非交互；使用 `--auto-init` 授权运行时准备，不要等待隐式终端提示。
 - 用户未指定输出路径时，优先使用 `work/<safe-source-stem>-transcript.md`；无法稳定获取 source stem 时使用 `work/transcript.md`。
 
+安装指令支持 `--target <path>`、`--force` 和 `--dry-run`；`--dry-run` 只显示 source/target，不写文件。`--print` 与 `--target`、`--force`、`--dry-run` 互斥。
+
 不得直接调用以下命令作为集成捷径（Do not call these directly as an integration shortcut）：
 
 - `yt-dlp`
@@ -70,3 +72,5 @@ cli/export-audio-slices.py \
 ```
 
 只有重叠 padding 确实有意且下游能够处理时才使用 `--allow-overlap`。每个时间范围的语义仍由下游流程负责。
+
+只处理你有权下载、录制、转写和学习的材料；不要重新分发受版权保护的音频或转写稿。完整边界见 `PRIVACY_AND_COPYRIGHT.md`。

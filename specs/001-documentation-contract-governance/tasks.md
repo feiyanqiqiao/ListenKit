@@ -72,6 +72,16 @@
 - [x] T027 [US3] 检查仓库根目录 `.gitattributes`、工作区、未跟踪文件、分支名和提交范围，确保只包含本次迁移且没有有价值内容丢失 per FR-010。
 - [x] T028 [US3] 提交迁移分支，推送 `codex/spec-kit-migration` 到 `origin`，并创建指向 `upstream/main` 的 GitHub PR per SC-007。
 
+## 阶段 7：Convergence——补齐契约遗漏
+
+**目的**：处理迁移后审计发现的公共契约遗漏，不改写前序任务记录。
+
+- [x] T029 [US1] 在 `README.md`、`docs/install.md` 和 `LLM_INTEGRATION.md` 保留 Windows 执行策略受限时的 `powershell -NoProfile -ExecutionPolicy Bypass -File` 恢复路径。
+- [x] T030 [US1] 在 `LLM_INTEGRATION.md` 和 `adapters/agent/listenkit-agent-instructions.md` 记录 Agent 安装器的 `--force`、`--dry-run`、`--print` 互斥和无写入边界 per FR-006。
+- [x] T031 [US2] 在 `docs/output-format.md` 增加终止型 transcript `error` payload 形状及禁止渲染规则，并保持 `LLM_INTEGRATION.md` 的权威链接一致 per FR-005。
+- [x] T032 [US1] 在 `LLM_INTEGRATION.md`、通用 Agent 指令、Claude 和 Cursor 适配器中补齐版权边界引用，并统一 Windows 首选分发器与兼容包装器的表述 per FR-003/FR-004。
+- [x] T033 [US3] 重新运行文档审计、Spec Kit status、编译、unittest、Git diff 和 PR head 检查；更新 `validation.md` 与 `convergence.md`，确认没有新的高/中/低缺口。
+
 ## 依赖与执行顺序
 
 ### 阶段依赖

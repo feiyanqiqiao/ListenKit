@@ -29,7 +29,7 @@ Bash 环境下 faster-whisper 的 Python 选择顺序为：
 
 原生 Windows 默认使用 `%LOCALAPPDATA%\ListenKit\venvs\cpython-314\Scripts\python.exe`。`LISTENKIT_FASTER_WHISPER_VENV_DIR` 可在所有支持平台覆盖环境目录；WSL 遵循 Bash/Linux 路径。
 
-原生 Windows 的公共边界是 `.\cli\generate-markdown.ps1`，它提供与 Bash 入口相同的网址/本地媒体、字幕优先、ASR fallback、JSON 和 Markdown 契约，且不要求 Bash。
+原生 Windows 的首选公共分发器是 `.\cli\listenkit.ps1 generate-markdown`；`.\cli\generate-markdown.ps1` 是仍受支持的兼容包装器。二者提供相同的网址/本地媒体、字幕优先、ASR fallback、JSON 和 Markdown 契约，且不要求 Bash。
 
 非交互调用方应传入 `--auto-init`，或先运行平台对应的 `init-faster-whisper` 入口。
 

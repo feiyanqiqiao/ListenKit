@@ -42,6 +42,21 @@ faster-whisper payload 还会报告选定的 `device`、`device_index` 和 `comp
 
 MLX Whisper payload 使用 `engine: "mlx-whisper"`、`device: "metal"`、设备索引 `0` 和 `compute_type: "float16"`。渲染后的 Markdown 包含实际引擎、设备和计算元数据。自动 MLX 不可用时，执行的 faster-whisper 引擎/设备会使 fallback 路径可见；CUDA 尝试失败时还会使用 `fallback_from` 和 `fallback_reason`。
 
+### Backend 错误 payload
+
+如果 backend 失败并输出 JSON，错误 payload 是终止状态，必须把 `error` 对象作为顶层第一个字段：
+
+```json
+{
+  "error": {
+    "type": "backend_error",
+    "message": "human-readable failure reason"
+  }
+}
+```
+
+渲染器和适配器不得将错误 payload 当作转写稿渲染；必须暴露错误并要求用户修复 backend 或重试。明确声明但未知的 schema version 同样必须拒绝，不能猜测其含义。
+
 ## Execution Report JSON
 
 `generate-markdown` 和 `transcribe-audio` 接受 `--report-json <path>`。execution report 是独立且原子写入的状态产物，不替代同 stem 的 transcript JSON，并且有意省略完整转写正文。

@@ -27,6 +27,12 @@ winget install Gyan.FFmpeg
 
 Windows 流程是原生 PowerShell 实现，不依赖 Bash、WSL、Git Bash 或 MSYS2。POSIX `.sh` 入口在 Git Bash/MSYS2/Cygwin 中会主动以退出码 64 拒绝；请使用 Python 或 PowerShell 分发器。
 
+如果 PowerShell 执行策略受限，可使用：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\cli\listenkit.ps1 generate-markdown --url "https://example.com/video" --language Japanese --output work\sample.md --auto-init
+```
+
 默认 ASR 策略会优先准备和使用硬件加速：Apple Silicon macOS 使用 MLX Whisper 与 Metal；Windows/Linux 的 NVIDIA 环境使用托管 CUDA，并在自动模式下记录失败原因后回退到 CPU INT8。Intel Mac 使用 CTranslate2 的 Apple Accelerate CPU 后端。
 
 可用的显式设备控制包括：`--device cpu`（可复现的 CPU-only 执行）、`--device cuda`（要求 CUDA 且不允许 CPU fallback）和 Apple Silicon 上的 `--engine mlx`（要求 MLX/Metal）。默认情况下请保持 engine 和 device 为 `auto`。

@@ -30,6 +30,8 @@
 
 `cli/install-agent-instructions.sh` 只安装 Agent instructions，不安装 Homebrew 软件包、Python、faster-whisper、Apple Speech 资源或 ASR 模型文件。对应的原生 Windows 安装器是 `.\cli\install-agent-instructions.ps1`，范围相同。
 
+持久安装模式支持 `--force` 覆盖已有目标和 `--dry-run` 只显示 source/target 而不写文件；`--dry-run` 必须与 `--target` 一起使用。`--print` 与 `--target`、`--force`、`--dry-run` 互斥，且只向 stdout 输出可粘贴的指令块。
+
 如果用户只要求读取 GitHub 仓库并使用 ListenKit 一次，可以跳过持久安装，直接运行公共入口。用户未指定 `--output` 时，优先使用 `work/<safe-source-stem>-transcript.md`；无法稳定取得 source stem 时使用 `work/transcript.md`。完成后应告知用户本次只使用了 ListenKit，未必完成持久化 Agent 安装。
 
 ## 公共入口
@@ -146,3 +148,7 @@ ListenKit 在转写规范化和纯文本渲染处停止。Markdown 或 JSON 生�
 - `cli/render-listening-note.py`
 
 Windows 对应的低层 `.ps1` 命令同样受此规则约束。直接调用低层接口只允许用于 ListenKit 自身调试或维护，详见 [`docs/debugging.md`](docs/debugging.md)。`cli/export-audio-slices.py` 是受支持的例外：下游已经选择明确时间范围时可以调用它。
+
+## 隐私与版权
+
+默认转写在本地完成，但下游 AI 编辑可能将转写文本和元数据发送给所使用的模型服务商。只处理你有权下载、录制、转写和学习的材料，不要使用本项目重新分发受版权保护的音频或转写稿。完整边界见 [`PRIVACY_AND_COPYRIGHT.md`](PRIVACY_AND_COPYRIGHT.md)。

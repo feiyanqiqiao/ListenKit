@@ -2,16 +2,16 @@
 
 本文档面向 ListenKit 维护者和集成调试，不是外部 LLM Agent 的公共契约。
 
-正常集成应调用：
+正常集成应调用首选分发器：
 
 ```bash
-cli/generate-markdown.sh (--url <url>|--input <path>) --language <label> --output <md>
+cli/listenkit.sh generate-markdown (--url <url>|--input <path>) --language <label> --output <md>
 ```
 
 原生 Windows：
 
 ```powershell
-.\cli\generate-markdown.ps1 (--url <url>|--input <path>) --language <label> --output <md>
+.\cli\listenkit.ps1 generate-markdown (--url <url>|--input <path>) --language <label> --output <md>
 ```
 
 命令还会在 Markdown 旁写入同 stem 的 transcript JSON。外部 Agent 应读取该 JSON，不要直接调用更低层的接口。
