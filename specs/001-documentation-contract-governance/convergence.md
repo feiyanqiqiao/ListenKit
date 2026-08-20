@@ -17,12 +17,12 @@
 | FR-004/FR-005 | `LLM_INTEGRATION.md`、`docs/output-format.md`、`docs/backends.md`、适配器摘要 | 安装器 invariant 测试、现有 schema/report/backend 测试 |
 | FR-006/FR-007 | `spec.md`、`plan.md`、`research.md`、`data-model.md`、`quickstart.md`、`tasks.md`、checklist、validation | 工件完整性检查、需求/任务/证据映射 |
 | FR-008 | `listenkit_cli/`、`cli/`、`tools/`、`tests/` 未被迁移修改 | `git diff main --` 源码范围为空，153 项测试通过 |
-| FR-010/SC-007 | `validation.md`、本记录、分支交付流程 | 编译、unittest、integration status、Git 审查；GitHub 推送/PR 由 T028 完成 |
+| FR-010/SC-007 | `validation.md`、本记录、分支交付流程 | 编译、unittest、integration status、Git 审查；分支已推送，PR 目标为 `upstream/main` |
 
 ## 任务收敛
 
 - T001-T027 已完成并在 `tasks.md` 标记为 `[x]`。
-- T028 是外部交付任务，依赖 GitHub 凭据和网络权限；在推送分支并创建 PR 后标记完成。
+- T028 已完成分支提交和推送；PR 创建动作仍需 GitHub API/CLI 凭据完成。
 - 本地没有 CRITICAL、HIGH、MEDIUM 或 LOW 的实现缺口，因此不追加 Convergence phase。
 
 ## 已知限制

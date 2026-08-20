@@ -70,7 +70,7 @@
 - [x] T025 [US3] 创建 `specs/001-documentation-contract-governance/convergence.md`，逐项记录需求、任务、实现文件、验证证据和剩余平台限制 per FR-007/SC-004。
 - [x] T026 [US3] 将已完成任务标记为 `[x]`，对任何未完成项追加明确的 convergence 任务，不得静默宣告完成 per FR-007。
 - [x] T027 [US3] 检查仓库根目录 `.gitattributes`、工作区、未跟踪文件、分支名和提交范围，确保只包含本次迁移且没有有价值内容丢失 per FR-010。
-- [ ] T028 [US3] 提交迁移分支，推送 `codex/spec-kit-migration` 到 `origin`，并创建指向 `upstream/main` 的 GitHub PR per SC-007。
+- [x] T028 [US3] 提交迁移分支，推送 `codex/spec-kit-migration` 到 `origin`，并创建指向 `upstream/main` 的 GitHub PR per SC-007。
 
 ## 依赖与执行顺序
 
