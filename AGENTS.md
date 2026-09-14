@@ -12,6 +12,7 @@
 - 仓库变更必须保持 Python 3.14 运行时隔离、UTF-8 I/O、transcript schema 兼容、原子输出写入和非交互自动化行为。
 - 正常集成不得直接调用 `yt-dlp`、`ffmpeg`、低层 `cli/*` 或 `tools/*` 绕过公共入口；低层接口只用于 ListenKit 自身调试和维护。
 - 需要明确时间范围的下游音频片段使用 `cli/export-audio-slices.py`，不直接调用 `ffmpeg`。
+- 编译、测试或运行过程中产生的派生与临时文件（包括 `__pycache__`、`*.pyc`、`.pytest_cache`、`tools/apple-speech-helper/.build` 等）严禁提交至版本控制；本地使用 `cli/clean.sh`（Windows 使用 `cli/clean.ps1`，或 `python -m listenkit_cli clean`）按需清理。
 
 # 交付前验证
 
@@ -22,9 +23,10 @@ python -m compileall -q listenkit_cli cli tools
 python -m unittest discover -s tests -v
 specify integration status --json
 python3 tools/spec-kit-governance/governance.py verify
+cli/clean.sh
 ```
 
-平台硬件和权限结论必须有匹配的真实设备验证。提交前还必须检查 `git status`、`git diff`、`git diff --check`、未跟踪文件和 `.gitattributes` 换行规则。
+平台硬件和权限结论必须有匹配的真实设备验证。完成验证并提交前运行 `cli/clean.sh` 清理派生文件，并检查 `git status`、`git diff`、`git diff --check`、未跟踪文件和 `.gitattributes` 换行规则。
 
 <!-- PROJECT-SPEC-KIT-GOVERNANCE:START -->
 
