@@ -36,6 +36,10 @@ This repository uses the committed project-local Spec Kit governance package.
 
 Read `docs/spec-kit/START_HERE.md` before substantive engineering work.
 
+At entry to an existing Spec Kit project, run `tools/spec-kit-governance/governance.py check-capabilities`. If `specify`, the active integration, `assess`, or `bug` is missing, ask the user whether to install the missing capability through the native CLI. If the user declines, return `HANDOFF_TO_AGENT` and let the current Agent continue without applying Reference governance to that capability.
+
+Whenever `.specify/` exists, independently of the central Reference or `GLOBAL_POLICY.md`, perform the upstream Spec Kit update check at most once per new Agent session before the first substantive action. Run the currently installed CLI's read-only `specify self check`; do not assume an exact version or installation source. Ask the user before `specify self upgrade` only when a newer CLI is reported. Regardless of whether that CLI upgrade is approved, declined, or not needed, inspect the current integration, installed extensions, and installed workflows using the CLI's actual help/status/list contracts and automatically run supported refresh commands such as `specify integration upgrade <active-key>`, `specify extension update`, and `specify workflow update` when components can be refreshed. If the CLI has no freshness field, a supported no-force update command may be run and its no-update result is sufficient. Do not install missing components, assume presets are covered, invent flags, or add `--force`. If refresh is blocked by modified managed files, a requested `--force`, an unsafe scope, or another irreversible choice, stop and ask the user with the exact reason and paths.
+
 A conversational approval such as `the plan is acceptable` advances a direction into the upstream Spec Kit workflow; it does not authorize direct application-code edits before the current Spec Kit artifacts are aligned.
 
 The governance package does not edit `.specify/**`, `specs/**`, or native Agent-generated integration files.
@@ -56,7 +60,7 @@ This check is active only when the current Agent has loaded the global Spec Kit 
 
 When `.specify/` and the committed project governance package are present, run the local governance manager's read-only `check-update --source <central-reference-path>` once before the first substantive task in a new Agent session. If the Policy or source locator is absent, skip this check silently; do not scan the computer for a Reference directory.
 
-If a verified Reference update is available, tell the user and wait for explicit approval before staging and applying a `plan-upgrade`. The sync may update only Reference-owned governance files and this managed block; it must never edit `.specify/**`, `specs/**`, native Agent files, or business code. After the governance sync, let the upstream Spec Kit workflow decide whether any specification, plan, or task artifacts need updating.
+If a verified Reference update is available, run the exact hash-bound `auto-upgrade` operation without waiting for project-owner approval. The sync may update only Reference-owned governance files and this managed block; it must never edit `.specify/**`, `specs/**`, native Agent files, or business code. After the governance sync, let the upstream Spec Kit workflow decide whether any specification, plan, or task artifacts need updating.
 
 A missing source, unclean source, invalid verification, offline check, or timeout is non-blocking in normal project work and must not be presented as an available update.
 
