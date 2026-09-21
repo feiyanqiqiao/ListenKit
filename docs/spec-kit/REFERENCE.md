@@ -19,17 +19,21 @@ The global CLI, project `.specify/` infrastructure, installed Agent integration,
 extensions, presets, workflows, events, and project Skills are separate layers.
 Installing or upgrading one layer does not imply that the others changed.
 
-# Project state and governed lifecycle
+# Project state and adaptive lifecycle
 
-`.specify/` means an existing Spec Kit project. Resume it, inspect `status --json`, and protect existing files. New substantive work uses the installed `governed-sdd` companion workflow when project configuration requires it:
+`.specify/` means an existing Spec Kit project. Resume it, inspect `status --json`, and protect existing files. New work is routed by intent and risk:
 
-`discovery → reviewed specification and plan → self-contained tasks → readiness and cold-start review → analyze → implement → validate → converge`
+`assessment` for undecided ideas, `bugfix` for known defects, the upstream short path for low-risk Features, and the full upstream path for high-risk Features.
+
+Before a high-risk Feature creates or updates artifacts, ask whether this Feature should use the task-scoped `governed-sdd` high-assurance profile or remain on the adaptive full upstream path. A task-scoped choice does not change the project's default configuration. Both routes use upstream Spec Kit; the companion adds the high-assurance review, readiness, and cold-start contract only when selected.
 
 Invocation syntax belongs to the installed integration. Validation and convergence are completion gates.
 
 The companion layer is installed and maintained through supported upstream workflow, extension, and preset commands. It orchestrates existing Spec Kit commands and Reference-owned gates; it is not a second specification engine. The Reference manager may inspect status and plan exact upstream CLI operations, but it must not write `.specify/**`, `specs/**`, or native Agent files directly.
 
-The companion must provide a discovery extension, tiny-model task-detail preset, `governed-sdd` workflow, and readiness adapter compatible with the installed CLI. Verify their status and tested version range from the current project. If any required primitive is unavailable, return `COMPANION_CAPABILITY_UNAVAILABLE`; do not fall back to the bundled shorter workflow.
+The companion provides the optional high-assurance profile. Verify its actual status when that profile is selected. In the adaptive profile, a missing companion is a warning and does not block ordinary upstream work. Never silently install, remove, or switch the companion during ordinary Feature work.
+
+At entry to a Spec Kit project, run the manager's capability check. It must detect the CLI, active integration, and official `assess` and `bug` extensions. For Feature work, also verify the once-per-project Constitution before starting `specify`. If a required capability is missing, ask the user whether to install it. If the user declines, return `HANDOFF_TO_AGENT`; do not retry or turn the decline into a permanent project error.
 
 Human review evidence is stored under `docs/spec-kit/features/<feature-id>/`. `DISCOVERY.md`, `REVIEW_LEDGER.json`, `TASK_READINESS.json`, and `COLD_START_VALIDATION.json` are project-local records and are never portable templates. Approval binds an artifact type to exact project-relative paths and SHA-256 values; live hash drift makes the approval stale.
 
@@ -77,23 +81,32 @@ specify self check
 specify self upgrade
 specify integration upgrade <key>
 specify extension update
+specify workflow update
 ```
+
+At most once per new Agent session, an existing `.specify/` project must run the
+read-only `specify self check`, regardless of whether this project carries the
+governance package or the current computer has a central Reference. A newer CLI
+requires explicit user approval before `specify self upgrade`. After that
+decision, inspect the active integration and installed extensions and workflows
+using the current CLI's help/status/list contracts. Supported refreshes of
+installed components are automatic; missing components are not installed by
+this check. Never add `--force`. Modified managed files, a requested force
+override, unsafe scope, or another irreversible choice requires user review.
 
 # Central Reference update check
 
 For a project that carries the committed governance package, the central Reference check is enabled only when the current Agent has loaded the global Policy and that Policy provides a readable `SPEC_KIT_GOVERNANCE_SOURCE` path. Before the first substantive task in a new session, run the local manager's read-only `check-update --source <central-reference-path>` at most once. If the Policy or locator is absent, skip silently; do not search the machine for a Reference directory.
 
-`UP_TO_DATE` means the target manifest source revision matches the clean central Reference checkout. `UPDATE_AVAILABLE` means a clean, ancestor central source has newer Reference content. `REVIEW_REQUIRED` means the baseline is divergent or the change includes Policy content. These statuses never authorize mutation. The user must approve an exact `plan-upgrade` and `apply-plan` before Reference-owned files are synchronized.
+`UP_TO_DATE` means the target manifest source revision matches the clean central Reference checkout. `UPDATE_AVAILABLE` means a clean, ancestor central source has newer Reference content. When the central source is available, the Agent automatically runs the exact hash-bound `auto-upgrade` operation. Project-owner approval is not required for this Reference-owned synchronization. A divergent baseline remains a real error and is never overwritten automatically.
 
 Reference synchronization updates only `docs/spec-kit/**`, the local governance manager, and the managed block in the explicit context anchor. It does not update `.specify/**`, `specs/**`, native Agent files, or business code. After synchronization, the upstream Spec Kit workflow decides whether any specification, plan, or task artifacts need updating.
 
 # Optional CLI update reminder
 
-An already Spec Kit project may opt into a lightweight reminder without installing the project governance package. `plan-install-update-reminder` appends a separate managed block to the exact existing Agent context anchor and asks the Agent to run upstream `specify self check` once per session. It requires only the installed CLI, an existing `.specify/` directory, and the explicit anchor path. It does not create `docs/spec-kit/**`, copy the manager, or modify `.specify/**`, `specs/**`, or native integration files. A detected update is reported to the user; `specify self upgrade` still requires explicit approval.
+An existing Spec Kit project without this local package remains a pure upstream project. Reference does not scan for it, install itself, or impose a central Reference update dependency. The project can still use the independent upstream update protocol through its global Agent rules or the managed reminder block installed by `plan-install-update-reminder`.
 
-For a substantive defect, use the installed project's bug workflow when the
-bug extension is present; verify reproduction, remediation, and validation.
-Do not report a bug as fixed merely because a command completed.
+For an undecided idea, use `$speckit-assess-intake`. For a known defect, use the Bug workflow with `$speckit-bug-assess` and verify reproduction, remediation, and validation. If `assess` or `bug` is missing, offer native CLI installation first. A user refusal hands the task back to the current Agent without a Reference blocker.
 
 Bundles, presets, workflows, and events are runtime-managed artifacts. Inspect
 their current status before changing them and do not claim that a non-default

@@ -63,6 +63,7 @@ CLI_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:(\.dev|a|b|rc)(\d+))?$")
 SAFE_RELATIVE = re.compile(r"^[^/\\].*$")
 STATUSES = {
     "CLI_MISSING", "CLI_INCOMPATIBLE", "CLI_VERSION_UNTESTED", "CLI_VERSION_UNPARSEABLE",
+    "CLI_CONTRACT_UNVERIFIED", "CAPABILITY_MISSING", "USER_DECLINED_CAPABILITY_INSTALL", "HANDOFF_TO_AGENT",
     "IDENTITY_UNKNOWN", "IDENTITY_CONFLICT", "KEY_REQUIRED", "PROJECT_NOT_INITIALIZED",
     "EXACT_NATIVE_INSTALLED", "NATIVE_CANDIDATE_NOT_INSTALLED", "NATIVE_CANDIDATE_INSTALLED_UNVERIFIED",
     "NATIVE_CANDIDATE_REJECTED", "NATIVE_INSTALL_BLOCKED", "AMBIGUOUS", "CATALOG_UNAVAILABLE",
@@ -339,22 +340,25 @@ def validate_project_package(root: Path) -> list[str]:
             if not isinstance(workflow, dict):
                 errors.append("PROJECT_CONFIG v2 requires workflow_governance")
             else:
-                if workflow.get("mode") != "governed-sdd-required":
-                    errors.append("PROJECT_CONFIG v2 requires governed-sdd-required mode")
-                expected_reviews = ARTIFACT_TYPES
-                configured_reviews = workflow.get("artifact_reviews")
-                if not isinstance(configured_reviews, list) or set(configured_reviews) != expected_reviews:
-                    errors.append("workflow_governance artifact_reviews must contain every governed artifact type")
-                if workflow.get("approval_evidence") != "committed-project-local":
-                    errors.append("workflow_governance approval_evidence must be committed-project-local")
-                if workflow.get("tiny_model_tasks") != "required":
-                    errors.append("workflow_governance tiny_model_tasks must be required")
-                cold_start = workflow.get("cold_start_review")
-                if not isinstance(cold_start, dict) or cold_start.get("required") is not True or not isinstance(cold_start.get("minimum_samples"), int) or cold_start.get("minimum_samples") < 1:
-                    errors.append("workflow_governance requires at least one cold-start sample")
+                if workflow.get("mode") not in {"upstream-adaptive", "governed-sdd"}:
+                    errors.append("PROJECT_CONFIG v2 requires upstream-adaptive or governed-sdd mode")
+                if workflow.get("discovery") not in {"risk-based", "required-for-high-risk", "required-for-substantive"}:
+                    errors.append("workflow_governance discovery mode is invalid")
+                if workflow.get("mode") == "governed-sdd":
+                    expected_reviews = ARTIFACT_TYPES
+                    configured_reviews = workflow.get("artifact_reviews")
+                    if not isinstance(configured_reviews, list) or set(configured_reviews) != expected_reviews:
+                        errors.append("governed-sdd artifact_reviews must contain every governed artifact type")
+                    if workflow.get("approval_evidence") != "committed-project-local":
+                        errors.append("governed-sdd approval_evidence must be committed-project-local")
+                    if workflow.get("tiny_model_tasks") != "required":
+                        errors.append("governed-sdd tiny_model_tasks must be required")
+                    cold_start = workflow.get("cold_start_review")
+                    if not isinstance(cold_start, dict) or cold_start.get("required") is not True or not isinstance(cold_start.get("minimum_samples"), int) or cold_start.get("minimum_samples") < 1:
+                        errors.append("governed-sdd requires at least one cold-start sample")
             for gate in ("clarify", "checklist", "analyze", "validate", "converge"):
-                if config.get("quality_gates", {}).get(gate) != "required":
-                    errors.append(f"PROJECT_CONFIG v2 quality gate {gate} must be required")
+                if config.get("quality_gates", {}).get(gate) not in {"required", "risk-triggered", "recommended", "off"}:
+                    errors.append(f"PROJECT_CONFIG v2 quality gate {gate} has an invalid policy")
     if adapter_path.is_file():
         registry = read_json(adapter_path)
         if registry.get("schema_version") != 1 or not isinstance(registry.get("anchors"), list) or not isinstance(registry.get("bindings"), list):
@@ -881,30 +885,63 @@ def validate_review_append_at_apply(root: Path, plan: dict[str, Any]) -> None:
 
 
 def cli_compatibility(root: Path) -> str:
-    version = cli_version()
-    if version is None:
+    executable = shutil.which("specify")
+    if not executable:
         return "CLI_MISSING"
-    try:
-        current = parse_cli_version(version)
-    except GovernanceError:
-        return "CLI_VERSION_UNPARSEABLE"
-    manifest_path = root / PROJECT_PACKAGE / "MANIFEST.json"
-    if not manifest_path.is_file():
-        return "READY"
-    manifest = read_json(manifest_path)
-    compatibility = manifest.get("specify_compatibility", {})
-    minimum = compatibility.get("minimum_version")
-    maximum = compatibility.get("maximum_version_exclusive")
-    tested = compatibility.get("tested_version")
-    if tested and current == parse_cli_version(tested):
-        return "READY"
-    if minimum and current < parse_cli_version(minimum):
-        return "CLI_INCOMPATIBLE"
-    if maximum and current >= parse_cli_version(maximum):
-        return "CLI_INCOMPATIBLE"
-    if tested and current > parse_cli_version(tested):
-        return "CLI_VERSION_UNTESTED"
-    return "READY"
+    # The CLI version is diagnostic data only.  Compatibility is established
+    # by probing the command and component contracts used by the requested
+    # operation; a newer or otherwise unparseable version must not be rejected
+    # merely because it is outside an old tested-version range.
+    return "READY" if cli_version() else "CLI_CONTRACT_UNVERIFIED"
+
+
+def adaptive_project_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Migrate the old mandatory companion defaults to the adaptive profile.
+
+    The migration is intentionally idempotent and only changes Reference-owned
+    configuration.  A project may still opt into ``governed-sdd`` explicitly,
+    but the former ``governed-sdd-required`` default is never carried forward.
+    """
+    updated = copy.deepcopy(config)
+    if updated.get("schema_version") == 2:
+        upgrade = updated.setdefault("upgrade", {})
+        if upgrade.get("review_mode") == "pull-request-required" or not upgrade.get("review_mode"):
+            upgrade["review_mode"] = "automatic-reference-upgrade"
+        workflow = updated.setdefault("workflow_governance", {})
+        if workflow.get("mode") == "governed-sdd-required" or not workflow.get("mode"):
+            workflow["mode"] = "upstream-adaptive"
+            workflow["discovery"] = "risk-based"
+            for key in ("artifact_reviews", "approval_evidence", "tiny_model_tasks", "cold_start_review"):
+                workflow.pop(key, None)
+        elif workflow.get("mode") == "governed-sdd":
+            workflow.setdefault("discovery", "required-for-substantive")
+        gates = updated.setdefault("quality_gates", {})
+        for key in ("clarify", "checklist", "analyze"):
+            if gates.get(key) == "required":
+                gates[key] = "risk-triggered"
+    return updated
+
+
+def cli_contract_metadata(reviewed_upstream: str | None, observed_version: str | None = None) -> dict[str, Any]:
+    """Return version-neutral compatibility metadata for a project manifest."""
+    return {
+        "required_capabilities": [
+            "specify",
+            "integration.status",
+            "extension.list",
+            "extension.add",
+        ],
+        "optional_capabilities": [
+            "workflow.list",
+            "preset.list",
+            "workflow.add",
+            "preset.add",
+        ],
+        "contract_schema": 1,
+        "observed_version": observed_version,
+        "contract_fingerprint": None,
+        "approved_install_ref": reviewed_upstream or "0" * 40,
+    }
 
 
 def governance_files(root: Path) -> list[str]:
@@ -970,14 +1007,33 @@ def marker_loader(documentation_language: str | None = None, source: Path | None
 def update_reminder_loader() -> str:
     return (
         f"{UPDATE_REMINDER_START_MARKER}\n\n"
-        "# Spec Kit CLI update reminder\n\n"
-        "This is a Reference-owned reminder. It does not modify `.specify/**`, `specs/**`, "
-        "or native Agent-generated integration files.\n\n"
-        "When `.specify/` exists, before the first substantive engineering action or mutation in a new Agent session, "
-        "run the upstream read-only command `specify self check` once.\n\n"
-        "If it reports a newer Specify CLI release, tell the user that an update is available and wait for explicit "
-        "approval before running `specify self upgrade`. If the check is offline or times out, report that it was "
-        "unavailable and continue. This reminder does not replace the upstream Spec Kit lifecycle.\n\n"
+        "# Spec Kit upstream update check\n\n"
+        "This is a project-local update protocol. It is independent of the central Reference, "
+        "`GLOBAL_POLICY.md`, and `docs/spec-kit/**`; it activates whenever `.specify/` exists.\n\n"
+        "Run at most once in each new Agent session, before the first substantive engineering action or mutation; "
+        "use the currently installed CLI to run the read-only command `specify self check`. Do not assume an exact "
+        "CLI version or a fixed install source. If the CLI is missing, ask the user whether to install the official "
+        "CLI and otherwise hand control back to the current Agent. If the check is offline or times out, report that "
+        "it was unavailable and continue normal work.\n\n"
+        "If a newer CLI is reported, show the available version and ask the user for explicit approval before running "
+        "`specify self upgrade`. A refusal or no-update result ends the CLI-upgrade branch; do not ask again in the "
+        "same session.\n\n"
+        "Regardless of whether the CLI upgrade was approved, declined, or not needed, use the currently active CLI "
+        "and project state to inspect the active integration and installed extensions "
+        "and workflows with the CLI's current `--help`, `status`, and `list` contracts. If an installed integration, "
+        "extension, or workflow is refreshable, run the current CLI's supported `specify integration upgrade "
+        "<active-key>`, `specify extension update`, or `specify workflow update` command automatically, without a "
+        "second user approval. If the CLI exposes no freshness field, the supported no-force update command may be "
+        "run for an installed component and its no-update result is sufficient. Normal confirmation prompts belonging "
+        "to these refresh commands are pre-authorized by "
+        "this protocol. Do not install missing components as part of refresh, do not assume presets are covered, and "
+        "do not invent flags or pin a version.\n\n"
+        "Never add `--force` to an automatic refresh. If the CLI refuses because managed files were modified, asks "
+        "for `--force`, reports an unsafe scope, or otherwise requires an irreversible choice, stop and ask the user "
+        "before proceeding. Preserve the project state and report the exact command and affected paths.\n\n"
+        "This protocol does not replace the upstream Spec Kit lifecycle and does not authorize the manager to edit "
+        "`.specify/**` or `specs/**`; supported upstream CLI commands remain the owner of their generated project "
+        "artifacts.\n\n"
         f"{UPDATE_REMINDER_END_MARKER}\n"
     )
 
@@ -1002,8 +1058,8 @@ def reference_update_loader(source: Path | None = None) -> str:
         "governance manager's read-only `check-update --source <central-reference-path>` once before "
         "the first substantive task in a new Agent session. If the Policy or source locator is absent, "
         "skip this check silently; do not scan the computer for a Reference directory.\n\n"
-        "If a verified Reference update is available, tell the user and wait for explicit approval before "
-        "staging and applying a `plan-upgrade`. The sync may update only Reference-owned governance files "
+        "If a verified Reference update is available, run the exact hash-bound `auto-upgrade` operation "
+        "without waiting for project-owner approval. The sync may update only Reference-owned governance files "
         "and this managed block; it must never edit `.specify/**`, `specs/**`, native Agent files, or "
         "business code. After the governance sync, let the upstream Spec Kit workflow decide whether any "
         "specification, plan, or task artifacts need updating.\n\n"
@@ -1303,6 +1359,10 @@ def governance_update_mutations(root: Path, source: Path, context_anchor: str | 
         "AGENT_ONBOARDING.md": source / "governance/project/AGENT_ONBOARDING.md",
     }
     mutations = [file_mutation(root, f"{PROJECT_PACKAGE}/{name}", path.read_bytes(), "replace") for name, path in mapping.items()]
+    config_path = root / PROJECT_PACKAGE / "PROJECT_CONFIG.json"
+    if config_path.is_file():
+        config = adaptive_project_config(read_json(config_path))
+        mutations.append(file_mutation(root, f"{PROJECT_PACKAGE}/PROJECT_CONFIG.json", canonical_json(config) + b"\n", "replace"))
     manager_source = source / "governance/manager/speckit_governance.py"
     if not manager_source.is_file():
         raise GovernanceError("governance manager is missing from update source", "CENTRAL_SOURCE_UNVERIFIED")
@@ -1316,13 +1376,10 @@ def governance_update_mutations(root: Path, source: Path, context_anchor: str | 
         manifest["policy_version"] = source_version(source, "POLICY_VERSION", manifest.get("policy_version"))
         manifest["reference_version"] = source_version(source, "REFERENCE_VERSION", manifest.get("reference_version"))
         manifest["manager_version"] = source_version(source, "MANAGER_VERSION", manifest.get("manager_version"))
-        if manifest["governance_package_version"] == "2.0.0":
-            manifest["specify_compatibility"] = {
-                "minimum_version": "1.0.4",
-                "tested_version": "1.0.4",
-                "maximum_version_exclusive": None,
-                "approved_install_ref": manifest.get("source", {}).get("reviewed_upstream_revision") or reviewed_upstream_revision(source),
-            }
+        manifest["specify_compatibility"] = cli_contract_metadata(
+            manifest.get("source", {}).get("reviewed_upstream_revision") or reviewed_upstream_revision(source),
+            cli_version(),
+        )
         manifest["source"] = manifest.get("source", {})
         source_revision_value = source_revision(source)
         if source_revision_value is None:
@@ -1411,12 +1468,10 @@ def governance_v2_upgrade_mutations(root: Path, source_snapshot: dict[str, Any],
     manifest["policy_version"] = source_version(source, "POLICY_VERSION", "2.0.0")
     manifest["reference_version"] = source_version(source, "REFERENCE_VERSION", REFERENCE_VERSION)
     manifest["manager_version"] = "2.0.0"
-    manifest["specify_compatibility"] = {
-        "minimum_version": "1.0.4",
-        "tested_version": "1.0.4",
-        "maximum_version_exclusive": None,
-        "approved_install_ref": manifest.get("source", {}).get("reviewed_upstream_revision") or reviewed_upstream_revision(source),
-    }
+    manifest["specify_compatibility"] = cli_contract_metadata(
+        manifest.get("source", {}).get("reviewed_upstream_revision") or reviewed_upstream_revision(source),
+        cli_version(),
+    )
     manifest.setdefault("source", {})["revision"] = source_snapshot["source_revision"]
     manifest["source"]["release"] = "v2.0.0"
     manifest["project_owned_prefixes"] = [f"{PROJECT_PACKAGE}/features/"]
@@ -1618,7 +1673,7 @@ def bootstrap_mutations(root: Path, source: Path, context_anchor: str) -> list[d
         "reference_version": source_version(source, "REFERENCE_VERSION", REFERENCE_VERSION),
         "manager_version": source_version(source, "MANAGER_VERSION", MANAGER_VERSION),
         "source": {"repository": "https://github.com/jiezhengj/Spec-Kit-Reference", "revision": source_revision_value, "release": f"v{source_version(source, 'GOVERNANCE_PACKAGE_VERSION', GOVERNANCE_PACKAGE_VERSION)}", "reviewed_upstream_revision": reviewed_upstream},
-        "specify_compatibility": {"minimum_version": "0.16.6", "tested_version": tested_cli, "maximum_version_exclusive": None, "approved_install_ref": reviewed_upstream},
+        "specify_compatibility": cli_contract_metadata(reviewed_upstream, tested_cli),
         "paths": {
             "start_here": f"{PROJECT_PACKAGE}/START_HERE.md", "policy": f"{PROJECT_PACKAGE}/POLICY.md",
             "reference": f"{PROJECT_PACKAGE}/REFERENCE.md", "operating_protocol": f"{PROJECT_PACKAGE}/OPERATING_PROTOCOL.md",
@@ -1665,7 +1720,7 @@ def cmd_doctor(root: Path) -> dict[str, Any]:
         result["package_errors"] = package_errors
     compatibility = cli_compatibility(root)
     result["cli_compatibility"] = compatibility
-    if compatibility not in {"READY", "CLI_MISSING"}:
+    if compatibility not in {"READY", "CLI_MISSING", "CLI_CONTRACT_UNVERIFIED"}:
         result["status"] = compatibility
     if version is None:
         result["status"] = "CLI_MISSING"
@@ -1673,8 +1728,100 @@ def cmd_doctor(root: Path) -> dict[str, Any]:
     if (root / PROJECT_PACKAGE / "PROJECT_CONFIG.json").is_file():
         result["project_config"] = project_config(root)
         result["governance_generation"] = governance_generation(root)
-        result["strict_feature_governance"] = "READY" if governance_generation(root) == 2 else "MIGRATION_REQUIRED"
+        config = result["project_config"]
+        result["workflow_profile"] = config.get("workflow_governance", {}).get("mode", "upstream-adaptive")
+        result["strict_feature_governance"] = "OPT_IN" if result["workflow_profile"] == "governed-sdd" else "DISABLED_BY_DEFAULT"
+        result["integration_status"] = integration_capability_status(root)
+        result["constitution"] = constitution_status(root) if (root / ".specify").is_dir() else None
+        if (root / ".specify").is_dir() and version is not None:
+            companion = companion_status(root)
+            result["companion"] = companion
+            if result["workflow_profile"] == "governed-sdd" and companion.get("status") != "READY":
+                result["status"] = companion.get("status", "COMPANION_CAPABILITY_UNAVAILABLE")
+            elif companion.get("status") not in {"READY", "MIGRATION_REQUIRED"}:
+                result.setdefault("warnings", []).append(
+                    f"optional governed-sdd companion status: {companion.get('status')}"
+                )
+        result["official_extensions"] = official_extension_status(root)
     return result
+
+
+def official_extension_status(root: Path) -> dict[str, Any]:
+    """Inspect official optional extensions without making any mutation."""
+    executable = shutil.which("specify")
+    expected = ("assess", "bug")
+    if not executable:
+        return {"status": "CLI_MISSING", "missing": list(expected), "extensions": {}}
+    help_result = subprocess.run(
+        [executable, "extension", "--help"], cwd=root, text=True, encoding="utf-8", errors="replace",
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    if help_result.returncode != 0:
+        return {"status": "CAPABILITY_MISSING", "missing": list(expected), "extensions": {}, "error": "extension command unavailable"}
+    list_result = subprocess.run(
+        [executable, "extension", "list", "--json"], cwd=root, text=True, encoding="utf-8", errors="replace",
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    if list_result.returncode != 0:
+        list_result = subprocess.run(
+            [executable, "extension", "list"], cwd=root, text=True, encoding="utf-8", errors="replace",
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+        )
+    output = list_result.stdout + list_result.stderr
+    extensions = {
+        item: bool(list_result.returncode == 0 and re.search(rf"(?<![A-Za-z0-9._-]){re.escape(item)}(?![A-Za-z0-9._-])", output))
+        for item in expected
+    }
+    missing = [item for item, installed in extensions.items() if not installed]
+    return {
+        "status": "READY" if not missing else "CAPABILITY_MISSING",
+        "missing": missing,
+        "extensions": extensions,
+        "inventory_sha256": sha256_bytes(output.encode("utf-8")),
+    }
+
+
+def integration_capability_status(root: Path) -> dict[str, Any]:
+    """Report the active native integration without changing project state."""
+    if not (root / ".specify").is_dir():
+        return {"status": "PROJECT_NOT_INITIALIZED", "active_integration": None}
+    try:
+        data = command_status(root)
+    except GovernanceError as exc:
+        return {"status": exc.status or "STATE_BROKEN", "active_integration": None, "error": str(exc)}
+    if not isinstance(data, dict):
+        return {"status": "CLI_CONTRACT_UNVERIFIED", "active_integration": None}
+    active = data.get("active_integration") or data.get("default_integration") or data.get("default")
+    if isinstance(active, dict):
+        active_key = active.get("key") or active.get("id") or active.get("name")
+    else:
+        active_key = active if isinstance(active, str) else None
+    installed = data.get("installed_integrations")
+    if not isinstance(installed, list):
+        installed = []
+    return {
+        "status": "READY" if active_key else "CAPABILITY_MISSING",
+        "active_integration": active_key,
+        "installed_integrations": installed,
+        "inventory_sha256": sha256_bytes(canonical_json(data)),
+    }
+
+
+def constitution_status(root: Path) -> dict[str, Any]:
+    """Detect whether Feature work has a usable project Constitution."""
+    path = root / ".specify/memory/constitution.md"
+    if not path.is_file():
+        return {"status": "MISSING", "path": ".specify/memory/constitution.md"}
+    text = path.read_text(encoding="utf-8", errors="replace")
+    lower = text.lower()
+    placeholder_tokens = ("[project_name]", "[principle_", "[section_", "[project principle")
+    placeholder = any(token in lower for token in placeholder_tokens)
+    return {
+        "status": "PLACEHOLDER" if placeholder else "READY",
+        "path": ".specify/memory/constitution.md",
+        "content_sha256": sha256_file(path),
+        "feature_action": "RUN_SPECKIT_CONSTITUTION" if placeholder else None,
+    }
 
 
 def companion_status(root: Path) -> dict[str, Any]:
@@ -1729,8 +1876,8 @@ def companion_status(root: Path) -> dict[str, Any]:
 
 def require_companion_cli_contract(root: Path) -> None:
     executable = shutil.which("specify")
-    if not executable or cli_version() != "1.0.4":
-        raise GovernanceError("companion plans require the reviewed Specify 1.0.4 CLI contract", "COMPANION_CAPABILITY_UNAVAILABLE")
+    if not executable:
+        raise GovernanceError("companion plans require an installed Specify CLI", "CLI_MISSING")
     expectations = {
         ("extension", "add"): ("--dev",),
         ("extension", "remove"): ("--force",),
@@ -1747,7 +1894,7 @@ def require_companion_cli_contract(root: Path) -> None:
         output = result.stdout + result.stderr
         if result.returncode != 0 or any(token not in output for token in required_tokens):
             raise GovernanceError(
-                f"installed Specify CLI lacks the reviewed {' '.join(command)} contract",
+                f"installed Specify CLI lacks the required {' '.join(command)} contract",
                 "COMPANION_CAPABILITY_UNAVAILABLE",
             )
 
@@ -2244,10 +2391,54 @@ def cmd_apply(root: Path, args: argparse.Namespace) -> dict[str, Any]:
     return {"status": "applied", "plan_id": plan["plan_id"], "changed": changed}
 
 
+def cmd_auto_upgrade(root: Path, args: argparse.Namespace) -> dict[str, Any]:
+    """Synchronize the Reference package without a project-owner approval gate.
+
+    The operation still creates the same hash-bound plan and runs the same
+    validation/recovery path.  Automatic means that the current Agent may
+    authorize the exact generated plan as part of session bootstrap; it does
+    not mean that arbitrary project files or upstream Spec artifacts are
+    overwritten.
+    """
+    planned = create_plan_command(root, "plan-upgrade", args)
+    apply_args = argparse.Namespace(
+        plan=planned["path"],
+        approve_plan_id=planned["plan_id"],
+        approve_plan_sha256=planned["plan_sha256"],
+    )
+    applied = cmd_apply(root, apply_args)
+    return {
+        "status": "AUTO_UPGRADED",
+        "plan_id": applied["plan_id"],
+        "changed": applied["changed"],
+        "owner_approval_required": False,
+    }
+
+
+def cmd_install_official_extension(root: Path, args: argparse.Namespace) -> dict[str, Any]:
+    """Install one official extension after the Agent has obtained consent."""
+    extension_id = getattr(args, "extension_id", None)
+    if extension_id not in {"assess", "bug"}:
+        raise GovernanceError("only the official assess and bug extensions are supported", "CAPABILITY_MISSING")
+    before = official_extension_status(root)
+    if before.get("status") == "CLI_MISSING":
+        return {"status": "CLI_MISSING", "required_extension": extension_id, "next_safe_step": "ask the user to install specify"}
+    if before.get("extensions", {}).get(extension_id) is True:
+        return {"status": "READY", "extension": extension_id, "changed": []}
+    planned = create_plan_command(root, "plan-extension-install", args)
+    applied = cmd_apply(root, argparse.Namespace(
+        plan=planned["path"], approve_plan_id=planned["plan_id"], approve_plan_sha256=planned["plan_sha256"],
+    ))
+    after = official_extension_status(root)
+    if after.get("extensions", {}).get(extension_id) is not True:
+        raise GovernanceError(f"official extension was not visible after installation: {extension_id}", "CAPABILITY_MISSING")
+    return {"status": "INSTALLED", "extension": extension_id, "plan_id": applied["plan_id"], "changed": applied["changed"]}
+
+
 def create_plan_command(root: Path, operation: str, args: argparse.Namespace) -> dict[str, Any]:
     if operation != "plan-governance-bootstrap" and operation not in {"plan-upgrade", "plan-rollback", "plan-activate-binding", "plan-record-artifact-review", "plan-upgrade-governance-v2", "plan-rollback-governance-v2"}:
         compatibility = cli_compatibility(root)
-        if compatibility != "READY":
+        if compatibility not in {"READY", "CLI_CONTRACT_UNVERIFIED"}:
             raise GovernanceError(f"Spec Kit CLI is not eligible for mutation: {compatibility}", compatibility)
     env_runtime = os.environ.get("SPEC_KIT_CURRENT_AGENT_ID")
     if getattr(args, "runtime_id", None) and env_runtime and args.runtime_id != env_runtime:
@@ -2495,7 +2686,8 @@ def create_plan_command(root: Path, operation: str, args: argparse.Namespace) ->
             if key == "generic":
                 argv.append(f"--integration-options=--commands-dir {args.commands_dir}")
         elif operation == "plan-extension-install":
-            argv = ["specify", "extension", "add", args.extension_directory]
+            extension_id = getattr(args, "extension_id", None)
+            argv = ["specify", "extension", "add", extension_id or args.extension_directory]
         elif operation == "plan-default-change":
             if not (root / ".specify").is_dir():
                 raise GovernanceError("default change requires an existing .specify project", "PROJECT_NOT_INITIALIZED")
@@ -2527,6 +2719,8 @@ def create_plan_command(root: Path, operation: str, args: argparse.Namespace) ->
             if isinstance(previous, str) and previous:
                 rollback_argv = ["specify", "integration", "use", previous]
         allowed_prefixes = [".specify/"]
+        if operation == "plan-extension-install":
+            allowed_prefixes.extend(sorted(runtime_reported_prefixes(command_status(root))))
         for prefix in getattr(args, "allowed_path_prefix", []) or []:
             allowed_prefixes.append(safe_relative(root, prefix).as_posix().rstrip("/") + "/")
         if operation == "plan-init" and rehearsal:
@@ -2578,6 +2772,44 @@ def dispatch(root: Path, args: argparse.Namespace) -> dict[str, Any]:
         return cmd_apply(root, args)
     if command == "check-companion-status":
         return companion_status(root)
+    if command == "check-capabilities":
+        cli_status = cli_compatibility(root)
+        integration = integration_capability_status(root) if cli_status in {"READY", "CLI_CONTRACT_UNVERIFIED"} else {"status": cli_status, "active_integration": None}
+        extensions = official_extension_status(root)
+        missing = extensions.get("missing", []) if isinstance(extensions, dict) else []
+        constitution = constitution_status(root)
+        workflow_actions: list[str] = []
+        if cli_status == "CLI_MISSING":
+            required_action = "ASK_USER_TO_INSTALL_SPECIFY"
+            workflow_actions.append(required_action)
+        elif integration.get("status") not in {"READY", "PROJECT_NOT_INITIALIZED"}:
+            required_action = "ASK_USER_TO_CONFIGURE_ACTIVE_INTEGRATION"
+            workflow_actions.append(required_action)
+        elif missing:
+            required_action = "ASK_USER_TO_INSTALL_MISSING_OFFICIAL_EXTENSIONS"
+            workflow_actions.append(required_action)
+        elif constitution.get("status") in {"MISSING", "PLACEHOLDER"}:
+            required_action = "ESTABLISH_CONSTITUTION_BEFORE_FEATURE"
+            workflow_actions.append(required_action)
+        else:
+            required_action = "READY"
+        if constitution.get("status") in {"MISSING", "PLACEHOLDER"}:
+            workflow_actions.append("ESTABLISH_CONSTITUTION_BEFORE_FEATURE")
+        return {
+            "status": "READY" if cli_status == "READY" and integration.get("status") in {"READY", "PROJECT_NOT_INITIALIZED"} and not missing else (cli_status if cli_status != "READY" else "CAPABILITY_MISSING"),
+            "cli_status": cli_status,
+            "specify_version": cli_version(),
+            "integration": integration,
+            "official_extensions": extensions,
+            "constitution": constitution,
+            "workflow_actions": list(dict.fromkeys(workflow_actions)),
+            "required_action": required_action,
+            "companion": companion_status(root) if (root / ".specify").is_dir() and (root / PROJECT_PACKAGE).is_dir() else None,
+        }
+    if command == "auto-upgrade":
+        return cmd_auto_upgrade(root, args)
+    if command == "install-official-extension":
+        return cmd_install_official_extension(root, args)
     if command == "check-artifact-approval":
         require_governance_v2(root)
         locations = feature_locations(root, args.feature_dir)
@@ -2649,7 +2881,7 @@ def dispatch(root: Path, args: argparse.Namespace) -> dict[str, Any]:
             if item
         ]
         policy_paths = {"GLOBAL_POLICY.md", "governance/project/POLICY.md"}
-        status = "REVIEW_REQUIRED" if policy_paths.intersection(changed_paths) else "UPDATE_AVAILABLE"
+        status = "UPDATE_AVAILABLE"
         return {
             "status": status,
             "source_revision": source_head,
@@ -2675,6 +2907,7 @@ def parser() -> argparse.ArgumentParser:
         item.add_argument("--source")
         item.add_argument("--force", action="store_true")
         item.add_argument("--extension-directory", default="__STAGED_EXTENSION_DIRECTORY__")
+        item.add_argument("--extension-id", choices=["assess", "bug"])
         item.add_argument("--version", default="VERSION_REQUIRED")
         item.add_argument("--attestation")
         item.add_argument("--commands-dir")
@@ -2706,12 +2939,22 @@ def parser() -> argparse.ArgumentParser:
     apply = sub.add_parser("apply-plan"); apply.add_argument("--plan", required=True); apply.add_argument("--approve-plan-id", required=True); apply.add_argument("--approve-plan-sha256", required=True)
     sub.add_parser("render"); sub.add_parser("verify")
     sub.add_parser("check-companion-status")
+    sub.add_parser("check-capabilities")
     for name in ("check-artifact-approval", "verify-task-package", "audit-feature-readiness"):
         item = sub.add_parser(name)
         item.add_argument("--feature-dir", required=True)
         if name == "check-artifact-approval":
             item.add_argument("--artifact-type", choices=sorted(ARTIFACT_TYPES), required=True)
     update = sub.add_parser("check-update"); update.add_argument("--source")
+    auto = sub.add_parser("auto-upgrade")
+    auto.add_argument("--source", required=True)
+    auto.add_argument("--context-anchor")
+    install = sub.add_parser("install-official-extension")
+    install.add_argument("--extension-id", choices=["assess", "bug"], required=True)
+    install.add_argument("--runtime-id")
+    install.add_argument("--integration-key")
+    install.add_argument("--extension-directory", default="__STAGED_EXTENSION_DIRECTORY__")
+    install.add_argument("--allowed-path-prefix", action="append", default=[])
     return p
 
 
