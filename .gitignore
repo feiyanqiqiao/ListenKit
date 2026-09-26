@@ -17,3 +17,4 @@ tmp/
 *.webm
 /.spec-kit-governance/
 /.specify/integrations/.cache/
+/.specify/extensions/.cache/
