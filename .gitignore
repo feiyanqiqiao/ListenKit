@@ -15,5 +15,6 @@ tmp/
 *.mp4
 *.mov
 *.webm
-/.spec-kit-governance/
 /.specify/integrations/.cache/
+/.specify/extensions/.cache/
+/.agent-state/spec_kit_component_update_cache.json
